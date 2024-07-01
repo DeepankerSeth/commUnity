@@ -40,7 +40,7 @@ export default function donate() {
           commUnity
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link href= "@/app/monitor/page</nav>" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+          <Link href= "/monitor" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
             Monitor
           </Link>
           <Link href="/predictions" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
