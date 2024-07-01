@@ -1,7 +1,7 @@
 import Image from "next/image";
-import { homepage } from "../pages/homepage"
+import  homepage from "./homepage/page";
 import Link from "next/link";
-import Layout from "./homepage/homepage.layout";
+import Layout from "./layout";
 
 const home = homepage();
 
