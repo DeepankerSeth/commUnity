@@ -25,6 +25,7 @@ To read more about using these font, please visit the Next.js documentation:
 **/
 // pages/predictions
 import Link from "next/link"
+import Footer from "@/components/ui/footer"
 
 export default function predictions() {
   return (
@@ -119,7 +120,7 @@ export default function predictions() {
                 </li>
               </ul>
               <Link
-                href="#"
+                href="/evacuation"
                 className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-md px-4 py-2 font-medium hover:bg-primary/90 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 prefetch={false}
               >
@@ -138,24 +139,7 @@ export default function predictions() {
           </section>
         </div>
       </main>
-      <footer className="bg-muted py-6 px-6 border-t">
-        <div className="container mx-auto max-w-5xl flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            &copy; 2024 commUnity. All rights reserved.
-          </p>
-          <nav className="flex items-center gap-4">
-            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Privacy
-            </Link>
-            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Terms
-            </Link>
-            <Link href="/contact" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Contact
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <Footer/>
     </div>
   )
 }

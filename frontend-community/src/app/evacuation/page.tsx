@@ -7,6 +7,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import Footer from "@/components/ui/footer"
 
 export default function evacuation() {
   return (
@@ -236,6 +237,7 @@ export default function evacuation() {
           </div>
         </section>
       </main>
+      <Footer/>
     </div>
   )
 }

@@ -20,6 +20,7 @@ To read more about using these font, please visit the Next.js documentation:
 // 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import Footer from "@/components/ui/footer"
 import contact from "../contact/page"
 
 const message = contact();
@@ -43,8 +44,7 @@ export default function homepage() {
           <Button
             variant="secondary"
             size="icon"
-            className="bg-gradient-to-r from-red-500 to-yellow-500 text-white hover:from-red-600 hover:to-yellow-600"
-          >
+            className="bg-gradient-to-r from-red-500 to-yellow-500 text-white hover:from-red-600 hover:to-yellow-600">
             <MicIcon className="w-4 h-4" />
             <span className="sr-only">Voice</span>
           </Button>
@@ -73,22 +73,24 @@ export default function homepage() {
           Evacuation
         </Link>
       </div>
-      <footer className="mt-12 w-full border-t pt-6 text-sm text-muted-foreground">
-        <div className="container mx-auto flex items-center justify-between">
-          <p>&copy; 2024 commUnity. All rights reserved.</p>
-          <nav className="flex items-center gap-4">
-            <Link href="#" className="hover:underline" prefetch={false}>
-              Privacy
+      <footer style={{ position: "fixed", bottom: 0, width:"100%" }} className="bg-muted py-6 px-6 border-t">
+      <div className="container mx-auto max-w-5xl flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          &copy; 2024 commUnity. All rights reserved.
+          </p>
+        <nav className="flex items-center gap-4">
+            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+            Privacy
             </Link>
-            <Link href="#" className="hover:underline" prefetch={false}>
-              Terms
+            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+            Terms
             </Link>
-            <Link href="/contact" className="hover:underline" prefetch={false}>
-              Contact
+            <Link href="/contact" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+            Contact
             </Link>
-          </nav>
-        </div>
-      </footer>
+        </nav>
+      </div>
+    </footer>
     </div>
   )
 }
