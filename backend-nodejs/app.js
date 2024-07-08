@@ -7,9 +7,11 @@
 
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const bodyParser = require('body-parser');
+const incidentRoutes = require('./routes/incidentRoutes');
 const cors = require('cors'); // Added CORS for cross-origin requests
 const express = require('express');
-const connectDB = require('./src/config/db');
+const connectDB = require('./src/config/mongodb'); // Updated to use the correct db file
 const apiGateway = require('./src/routes/apiGateway');
 const dashboardRoutes = require('./src/routes/dashboard');
 const apiForMobileRoutes = require('./src/routes/apiForMobile');
@@ -24,6 +26,9 @@ connectDB();
 // Security middleware
 app.use(helmet()); // Protects against well-known vulnerabilities
 app.use(cors()); // Enables CORS for all routes
+
+app.use(bodyParser.json());
+app.use('/api', incidentRoutes);
 
 // Rate limiting middleware
 const limiter = rateLimit({
@@ -43,7 +48,15 @@ app.use('/api', apiGateway);
 app.use('/dashboard', dashboardRoutes);
 app.use('/apiForMobile', apiForMobileRoutes);
 
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+module.exports = app;

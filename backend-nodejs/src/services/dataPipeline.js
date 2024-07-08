@@ -10,16 +10,13 @@ const { logData } = require('../utils/logger'); // Added logging
 const ingestData = async () => {
   try {
     const disasterData = await fetchDisasterData();
-    const radrData = await fetchRadrData();
     const cleanedDisasterData = cleanData(disasterData);
-    const cleanedRadrData = cleanData(radrData);
 
     // Log the ingested data
     logData('Disaster Data', cleanedDisasterData);
-    logData('RADR Data', cleanedRadrData);
 
     // Process and store cleaned data
-    console.log('Data ingested and cleaned:', { cleanedDisasterData, cleanedRadrData });
+    console.log('Data ingested and cleaned:', { cleanedDisasterData });
   } catch (error) {
     console.error('Error ingesting data:', error);
   }
