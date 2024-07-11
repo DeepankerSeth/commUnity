@@ -11,6 +11,20 @@ import LocalUpdatesBanner from '../../components/LocalUpdatesBanner';
 SplashScreen.preventAutoHideAsync();
 
 export default function Homepage() {
+  const [fontsLoaded] = useFonts({
+    PlayfairDisplay_700Bold,
+    Calistoga_400Regular,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   const handleVoicePress = () => {
     // Add your voice functionality here
@@ -22,8 +36,23 @@ export default function Homepage() {
     console.log('Searching for:', query);
   };
 
+  const handleReportIncident = () => {
+    // Implement your report incident logic here
+    console.log('Report Incident button pressed');
+  };
+
+  const handleLocalSituation = () => {
+    // Implement your local situation logic here
+    console.log('My Local Situation button pressed');
+  };
+
+  const handleEvacuation = () => {
+    // Implement your evacuation logic here
+    console.log('Evacuation button pressed');
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} onLayout={onLayoutRootView}>
       <View style={styles.header}>
         <Text style={styles.logo}>commUnity</Text>
       </View>
@@ -36,7 +65,18 @@ export default function Homepage() {
         </View>
       </View>
       <LocalUpdatesBanner />
-      <View style={styles.linkContainer}>
+      <TouchableOpacity style={styles.reportButton} onPress={handleReportIncident}>
+        <Text style={styles.reportButtonText}>Report an Incident</Text>
+      </TouchableOpacity>
+      <View style={styles.sideBySideButtons}>
+        <TouchableOpacity style={styles.sideButton} onPress={handleLocalSituation}>
+          <Text style={styles.sideButtonText}>My Local Situation</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.sideButton} onPress={handleEvacuation}>
+          <Text style={styles.sideButtonText}>Evacuation</Text>
+        </TouchableOpacity>
+      </View>
+      {/* <View style={styles.linkContainer}>
         <TouchableOpacity style={styles.link} onPress={() => {}}>
           <Text style={styles.linkText}>Monitor</Text>
         </TouchableOpacity>
@@ -46,7 +86,7 @@ export default function Homepage() {
         <TouchableOpacity style={styles.link} onPress={() => {}}>
           <Text style={styles.linkText}>Evacuation</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </ScrollView>
   );
 }
@@ -120,6 +160,40 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  reportButton: {
+    backgroundColor: '#ff6347', // Tomato color
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    marginVertical: 16,
+    alignItems: 'center',
+  },
+  reportButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  sideBySideButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sideButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 8,
+    alignItems: 'center',
+  },
+  sideButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   linkContainer: {
     flexDirection: 'row',

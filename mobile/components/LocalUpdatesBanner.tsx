@@ -19,15 +19,15 @@ const LocalUpdatesBanner = () => {
 
 const styles = StyleSheet.create({
   banner: {
-    width: width - 40, // Full width with some padding
+    width: '100%', 
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 20,
+    marginVertical: 10,
   },
   text: {
-    color: 'green', // Changed text color to white for better contrast
+    color: 'black', // Changed text color to white for better contrast
     fontSize: 18,
     fontWeight: 'bold',
   },
