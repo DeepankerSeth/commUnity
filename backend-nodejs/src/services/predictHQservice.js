@@ -1,8 +1,5 @@
 // Purpose: Fetch data from PredictHQ API.
 
-// Improvements:
-// Implemented caching to reduce API calls.
-
 // src/services/predictHQService.js
 const axios = require('axios');
 const NodeCache = require('node-cache'); // Added caching

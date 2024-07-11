@@ -1,50 +1,97 @@
+// server.js
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
-const { processIncident, updateIncident } = require('./llmProcessor');
-
+const { Storage } = require('@google-cloud/storage');
+const speech = require('@google-cloud/speech');
+const mongoose = require('mongoose');
+const IncidentReport = require('./models/incidentReport');
 const app = require('./app');
+const upload = multer({ dest: 'uploads/' });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Import the monitorIncidents function
+const { monitorIncidents } = require('./workers/monitorIncidents');
 
-// Set up multer for handling file uploads
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// Import functions from llmProcessor.js
+const { createIncidentReport, getIncidentUpdates } = require('./src/ai/llmProcessor');
+
+// Initialize Google Cloud Storage
+const storage = new Storage();
+const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
+
+// Initialize Google Cloud Speech-to-Text client
+const speechClient = new speech.SpeechClient();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
 app.use(express.json());
 
 /**
  * API endpoint for reporting incidents
- * Accepts photo, video, and file uploads along with a description
+ * Accepts photo, and file uploads along with a description
  */
-app.post('/api/report', upload.fields([{ name: 'photo', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'file', maxCount: 1 }]), async (req, res) => {
+
+// Report an incident
+app.post('/api/incidents', upload.array('media'), async (req, res) => {
   try {
-    const { description } = req.body;
-    const photo = req.files['photo'] ? req.files['photo'][0].buffer.toString('base64') : null;
-    const video = req.files['video'] ? req.files['video'][0].buffer.toString('base64') : null;
-    const file = req.files['file'] ? req.files['file'][0].buffer.toString('base64') : null;
+    const { userId, type, description, latitude, longitude } = req.body;
+    const mediaFiles = req.files;
 
-    // Insert new incident report into Supabase
-    const { data, error } = await supabase
-      .from('incidents')
-      .insert([{ description, photo, video, file }]);
+    // Upload media files to Google Cloud Storage
+    const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
+      const blob = bucket.file(file.originalname);
+      await blob.save(file.buffer);
+      return blob.publicUrl();
+    }));
 
-    if (error) throw error;
+    // Create incident report
+    const incidentData = { userId, type, description, latitude, longitude, mediaUrls };
+    const incidentReport = await createIncidentReport(incidentData);
 
-    const incident = data[0];
-
-    // Process the incident with the LLM
-    const analysis = await processIncident(incident);
-    await updateIncident(incident.id, { description, analysis });
-
-    res.status(200).json({ ...incident, analysis });
+    res.status(201).json({ message: 'Incident reported successfully', incidentId: incidentReport._id });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while reporting the incident' });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// Get incident updates
+app.get('/api/incidents/:id/updates', async (req, res) => {
+  try {
+    const incidentId = req.params.id;
+    const analysis = await getIncidentUpdates(incidentId);
+    res.json({ update: analysis });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while fetching incident updates' });
+  }
 });
+
+// Handle voice input
+app.post('/api/incidents/voice', upload.single('audio'), async (req, res) => {
+  try {
+    const audio = req.file;
+    const audioBytes = audio.buffer.toString('base64');
+
+    const [response] = await speechClient.recognize({
+      audio: { content: audioBytes },
+      config: {
+        encoding: 'LINEAR16',
+        sampleRateHertz: 16000,
+        languageCode: 'en-US',
+      },
+    });
+
+    const transcription = response.results.map(result => result.alternatives[0].transcript).join('\n');
+    res.status(200).json({ transcription });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while processing the audio' });
+  }
+});
+
+// Start the incident monitoring worker
+monitorIncidents();
+
+module.exports = app;

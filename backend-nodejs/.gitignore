@@ -1,1 +1,25 @@
 .env
+
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Uploads
+uploads/
+
+# Coverage reports
+coverage/
+
+# Local environment settings
+.vscode/

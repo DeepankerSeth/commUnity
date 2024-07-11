@@ -1,10 +1,18 @@
-const { storeIncident } = require('../services/incidentService');
+const { createIncidentReport } = require('../ai/llmProcessor');
+const { uploadFile } = require('../services/storageService');
 
 async function createIncident(req, res) {
   try {
     const file = req.file; // Assuming you use multer for file uploads
     const metadata = req.body;
-    const incident = await storeIncident(file, metadata);
+
+    // Upload file to Google Cloud Storage
+    const fileUrl = await uploadFile(file);
+
+    // Create incident report
+    const incidentData = { ...metadata, mediaUrls: [fileUrl] };
+    const incident = await createIncidentReport(incidentData);
+
     res.status(201).json(incident);
   } catch (error) {
     console.error(error);
