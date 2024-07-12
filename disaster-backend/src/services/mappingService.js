@@ -5,7 +5,7 @@
 // Integrated with Google Maps API.
 
 // src/services/mappingService.js
-const axios = require('axios');
+import axios from 'axios';
 
 // Function to get evacuation route from a mapping API
 const getEvacuationRoute = async (start, end) => {
@@ -19,5 +19,4 @@ const getEvacuationRoute = async (start, end) => {
 };
 
 // Export the getEvacuationRoute function
-module.exports = { getEvacuationRoute };
-
+export { getEvacuationRoute };

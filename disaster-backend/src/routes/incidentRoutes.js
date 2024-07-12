@@ -1,6 +1,6 @@
-const express = require('express');
-const { uploadFile } = require('../storage/googleCloudStorage');
-const { createIncidentReport } = require('../ai/llmProcessor');
+import express from 'express';
+import { uploadFile } from '../storage/googleCloudStorage.js';
+import { createIncidentReport } from '../ai/llmProcessor.js';
 
 const router = express.Router();
 
@@ -24,4 +24,4 @@ router.post('/report', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

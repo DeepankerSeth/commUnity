@@ -1,7 +1,7 @@
 //Setting up a basic Express route to serve the dashboard
 
 // src/routes/dashboard.js
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
 // Route to render the dashboard
@@ -10,4 +10,4 @@ router.get('/', (req, res) => {
 });
 
 // Export the router
-module.exports = router;
+export default router;

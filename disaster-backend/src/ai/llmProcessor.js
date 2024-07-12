@@ -1,20 +1,24 @@
-const { Configuration, OpenAIApi } = require('openai');
-const { PineconeStore } = require('@langchain/pinecone');
-const { Pinecone } = require('@pinecone-database/pinecone');
-const mongoose = require('mongoose');
-const IncidentReport = require('../models/incidentReport');
-const { uploadFile } = require('../services/storageService');
-const db = require('../config/postgres');
+import { OpenAI } from '@langchain/openai';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { PineconeStore } from '@langchain/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
+import mongoose from 'mongoose';
+import IncidentReport from '../models/incidentReport.js';
+import { uploadFile } from '../services/storageService.js';
 
 // Initialize OpenAI client
-const openai = new OpenAIApi(new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-}));
+const openai = new OpenAI({
+  openAIApiKey: process.env.OPENAI_API_KEY,
+});
+
+// Initialize OpenAI embeddings
+const embeddings = new OpenAIEmbeddings({
+  openAIApiKey: process.env.OPENAI_API_KEY,
+});
 
 // Initialize Pinecone
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY,
-  environment: process.env.PINECONE_ENVIRONMENT,
+  apiKey: process.env.PINECONE_API_KEY
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
@@ -31,9 +35,9 @@ const vectorStore = await PineconeStore.fromExistingIndex(
  * @param {string} text - The text to generate an embedding for
  * @returns {Promise<Array>} - The generated embedding
  */
-async function generateEmbedding(text) {
+export async function generateEmbedding(text) {
   try {
-    const response = await openai.embeddings.create({
+    const response = await embeddings.embeddings.create({
       model: "text-embedding-3-large",
       input: text,
     });
@@ -49,7 +53,7 @@ async function generateEmbedding(text) {
  * @param {Object} incident - The incident report to process
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
-async function processIncident(incident) {
+export async function processIncident(incident) {
   const { description, photo, video, file } = incident;
 
   // Construct prompt for LLM
@@ -76,7 +80,7 @@ Analyze this incident report and provide a detailed picture of the incident incl
  * @param {Object} newReport - The new report containing additional information
  * @returns {Promise<Object>} - The updated incident
  */
-async function updateIncident(incidentId, newReport) {
+export async function updateIncident(incidentId, newReport) {
   // Fetch existing incident
   const existingIncident = await IncidentReport.findById(incidentId);
 
@@ -109,11 +113,11 @@ Analyze the combined reports and provide a comprehensive update on the incident.
 }
 
 /**
- * Creates a new incident report and stores it in MongoDB, Pinecone, and PostgreSQL
+ * Creates a new incident report and stores it in MongoDB and Pinecone
  * @param {Object} incidentData - The incident data to store
  * @returns {Promise<Object>} - The created incident report
  */
-async function createIncidentReport(incidentData) {
+export async function createIncidentReport(incidentData) {
   const { userId, type, description, latitude, longitude, mediaUrls } = incidentData;
 
   // Create incident report in MongoDB
@@ -152,13 +156,6 @@ async function createIncidentReport(incidentData) {
   incidentReport.vectorId = vectorId;
   await incidentReport.save();
 
-  // Store structured data in PostgreSQL
-  await db.none('INSERT INTO incidents (id, user_id, description) VALUES ($1, $2, $3)', [
-    incidentReport._id,
-    userId,
-    description,
-  ]);
-
   return incidentReport;
 }
 
@@ -167,7 +164,7 @@ async function createIncidentReport(incidentData) {
  * @param {string} incidentId - The ID of the incident to update
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
-async function getIncidentUpdates(incidentId) {
+export async function getIncidentUpdates(incidentId) {
   const incident = await IncidentReport.findById(incidentId);
 
   if (!incident) {
@@ -202,5 +199,3 @@ async function getIncidentUpdates(incidentId) {
 
   return response.choices[0].message.content;
 }
-
-module.exports = { processIncident, updateIncident, createIncidentReport, getIncidentUpdates, generateEmbedding };

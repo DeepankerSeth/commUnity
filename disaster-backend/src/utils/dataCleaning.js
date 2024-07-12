@@ -1,6 +1,8 @@
 // Purpose: Clean and preprocess data.
 
 // src/utils/dataCleaning.js
+import { cleanData } from './dataCleaning';
+
 const cleanData = (data) => {
   // Implement data cleaning logic
   // Example: Remove null values, format dates, etc.
@@ -8,4 +10,4 @@ const cleanData = (data) => {
 };
 
 // Export the cleanData function
-module.exports = { cleanData };
+export { cleanData };

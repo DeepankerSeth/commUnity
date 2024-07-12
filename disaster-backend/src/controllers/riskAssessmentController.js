@@ -1,7 +1,7 @@
 // Implement real-time risk assessment with Predict HQ
 
 // src/controllers/riskAssessmentController.js
-const { fetchDisasterData } = require('../services/predictHQservice');
+import { fetchDisasterData } from '../services/predictHQservice';
 
 // Function to assess risk
 const assessRisk = async (req, res) => {
@@ -22,4 +22,4 @@ const calculateRisk = (data) => {
 };
 
 // Export the assessRisk function
-module.exports = { assessRisk };
+export { assessRisk };

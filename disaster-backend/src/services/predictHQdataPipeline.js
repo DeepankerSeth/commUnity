@@ -1,10 +1,8 @@
 // Purpose: Ingest and process real-time data from PredictHQ (later multiple sources).
 
-
-// src/services/dataPipeline.js
-const { fetchDisasterData } = require('./predictHQservice');
-const { cleanData } = require('../utils/dataCleaning');
-const { logData } = require('../utils/logger'); // Added logging
+import { fetchDisasterData } from './predictHQservice';
+import { cleanData } from '../utils/dataCleaning';
+import { logData } from '../utils/logger'; // Added logging
 
 // Function to ingest and process data
 const ingestData = async () => {
@@ -22,6 +20,4 @@ const ingestData = async () => {
   }
 };
 
-// Export the ingestData function
-module.exports = { ingestData };
-
+export { ingestData };

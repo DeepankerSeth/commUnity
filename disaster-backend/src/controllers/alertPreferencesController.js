@@ -1,7 +1,7 @@
 // Creating customizable alert preferences
 
 // src/controllers/alertPreferencesController.js
-const User = require('../models/userModel'); // Assuming a User model exists
+import User from '../models/userModel'; // Assuming a User model exists
 
 // Function to update user alert preferences
 const updatePreferences = async (req, res) => {
@@ -15,5 +15,4 @@ const updatePreferences = async (req, res) => {
 };
 
 // Export the updatePreferences function
-module.exports = { updatePreferences };
-
+export { updatePreferences };

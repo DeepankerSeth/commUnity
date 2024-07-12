@@ -1,6 +1,4 @@
-
-// src/models/incidentReport.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const incidentReportSchema = new mongoose.Schema({
   userId: String,
@@ -17,4 +15,4 @@ const incidentReportSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('IncidentReport', incidentReportSchema);
+export default mongoose.model('IncidentReport', incidentReportSchema);

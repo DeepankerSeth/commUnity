@@ -1,12 +1,9 @@
-// Purpose: Send multi-channel alerts.
-// Early Warning System: Developing a multi-channel alert system
-
-// Improvements:
-// Integrated with Twilio for SMS and Nodemailer for email.
+// Purpose: Send multi-channel alerts based on user preferences.
 
 // src/services/alertService.js
-const twilio = require('twilio'); // Example for SMS
-const nodemailer = require('nodemailer'); // Example for email
+import twilio from 'twilio'; // Example for SMS
+import nodemailer from 'nodemailer'; // Example for email
+import User from '../models/userModel';
 
 // Twilio configuration for SMS
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -21,34 +18,41 @@ const transporter = nodemailer.createTransport({
 });
 
 // Function to send alerts
-const sendAlert = (message, channels) => {
-  channels.forEach(channel => {
-    if (channel.type === 'sms') {
-      // Send SMS using Twilio
-      twilioClient.messages.create({
+const sendAlert = async (message, userId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const { alertPreferences } = user;
+
+    if (alertPreferences.sms) {
+      await twilioClient.messages.create({
         body: message,
         from: process.env.TWILIO_PHONE_NUMBER,
-        to: channel.to,
-      }).then(message => console.log(`SMS sent: ${message.sid}`))
-        .catch(error => console.error('Error sending SMS:', error));
-    } else if (channel.type === 'email') {
-      // Send email using Nodemailer
-      const mailOptions = {
+        to: user.phoneNumber,
+      });
+      console.log(`SMS sent to user ${userId}`);
+    }
+
+    if (alertPreferences.email) {
+      await transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: channel.to,
+        to: user.email,
         subject: 'Disaster Alert',
         text: message,
-      };
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.error('Error sending email:', error);
-        } else {
-          console.log(`Email sent: ${info.response}`);
-        }
       });
+      console.log(`Email sent to user ${userId}`);
     }
-  });
+
+    if (alertPreferences.push) {
+      // Implement push notification logic here
+      console.log(`Push notification sent to user ${userId}`);
+    }
+  } catch (error) {
+    console.error('Error sending alert:', error);
+  }
 };
 
-// Export the sendAlert function
-module.exports = { sendAlert };
+export { sendAlert };

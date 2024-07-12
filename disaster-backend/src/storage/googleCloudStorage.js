@@ -1,5 +1,5 @@
-const { Storage } = require('@google-cloud/storage');
-const path = require('path');
+import { Storage } from '@google-cloud/storage';
+import path from 'path';
 
 const storage = new Storage();
 
@@ -12,4 +12,4 @@ const uploadFile = async (filePath) => {
   console.log(`${filePath} uploaded to ${bucketName}`);
 };
 
-module.exports = { uploadFile };
+export { uploadFile };

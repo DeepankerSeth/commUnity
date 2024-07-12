@@ -1,6 +1,6 @@
-const { Storage } = require('@google-cloud/storage');
-const path = require('path');
-const dotenv = require('dotenv');
+import { Storage } from '@google-cloud/storage';
+import path from 'path';
+import dotenv from 'dotenv';
 dotenv.config();
 
 const storage = new Storage();
@@ -15,4 +15,4 @@ async function uploadFile(file) {
   return fileUrl;
 }
 
-module.exports = { uploadFile };
+export { uploadFile };

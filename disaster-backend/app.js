@@ -5,21 +5,23 @@
 // Added CORS for cross-origin requests.
 // Added comments for clarity.
 
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const bodyParser = require('body-parser');
-const cors = require('cors'); // Added CORS for cross-origin requests
-const express = require('express');
-const connectDB = require('./src/db/mongodb');
-const apiGateway = require('./src/middleware/apiGateway');
-const dashboardRoutes = require('./src/routes/dashboard');
-const apiForMobileRoutes = require('./src/routes/apiForMobile');
-const incidentRoutes = require('./src/routes/incidentRoutes');
-const errorHandler = require('./middleware/errorHandler');
-require('dotenv').config();
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import bodyParser from 'body-parser';
+import cors from 'cors'; // Added CORS for cross-origin requests
+import express from 'express';
+import connectDB from './src/db/mongodb.js';
+import apiGateway from './src/middleware/apiGateway.js';
+import dashboardRoutes from './src/routes/dashboard.js';
+import apiForMobileRoutes from './src/routes/api.js';
+import incidentRoutes from './src/routes/incidentRoutes.js';
+import errorHandler from './src/middleware/errorHandler.js';
+import dotenv from 'dotenv';
+import { monitorIncidents } from './src/workers/monitorIncidents.js';
+import evacuationRoutes from './src/routes/evacuationRoutes.js';
+import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
 
-// Import the monitorIncidents function
-const { monitorIncidents } = require('./src/workers/monitorIncidents');
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -38,7 +40,11 @@ app.use('/incidents', incidentRoutes);
 
 // Security middleware
 app.use(helmet()); // Protects against well-known vulnerabilities
-app.use(cors()); // Enables CORS for all routes
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+})); // Enables CORS for all routes
 
 // Rate limiting middleware
 const limiter = rateLimit({
@@ -55,8 +61,10 @@ app.use(express.static('public'));
 
 // Use routes
 app.use('/api', apiGateway);
-app.use('/dashboard', dashboardRoutes);
-app.use('/apiForMobile', apiForMobileRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/incidents', incidentRoutes);
+app.use('/api/evacuation', evacuationRoutes);
+app.use('/api/alert-preferences', alertPreferencesRoutes);
 
 // Global error handler
 app.use(errorHandler);
@@ -64,4 +72,4 @@ app.use(errorHandler);
 // Start the incident monitoring worker
 monitorIncidents();
 
-module.exports = app;
+export default app;

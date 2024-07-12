@@ -1,14 +1,16 @@
 // workers/monitorIncidents.js
-require('dotenv').config();
-const { PineconeStore } = require("@langchain/pinecone");
-const { Pinecone } = require("@pinecone-database/pinecone");
-const mongoose = require('mongoose');
-const IncidentReport = require('../models/incidentReport');
-const { getIncidentUpdates } = require('../ai/llmProcessor');
+import dotenv from 'dotenv';
+import { PineconeStore } from '@langchain/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
+import mongoose from 'mongoose';
+import IncidentReport from '../models/incidentReport.js';
+import { getIncidentUpdates } from '../ai/llmProcessor.js';
+import { OpenAI } from '@langchain/openai';
+
+dotenv.config();
 
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY,
-  environment: process.env.PINECONE_ENVIRONMENT,
+  apiKey: process.env.PINECONE_API_KEY
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
@@ -21,8 +23,8 @@ const vectorStore = await PineconeStore.fromExistingIndex(
 
 async function monitorIncidents() {
   try {
-    const recentIncidents = await IncidentReport.find({ 
-      createdAt: { $gte: new Date(Date.now() - 30*60*1000) } // Last 30 minutes
+    const recentIncidents = await IncidentReport.find({
+      createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes
     });
 
     for (const incident of recentIncidents) {
@@ -55,4 +57,4 @@ setInterval(monitorIncidents, 5 * 60 * 1000);
 
 console.log('Incident monitoring worker started');
 
-module.exports = { monitorIncidents };
+export { monitorIncidents };

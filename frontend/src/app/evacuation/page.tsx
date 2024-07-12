@@ -8,8 +8,26 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import Footer from "@/components/ui/footer"
+import { useState, useEffect } from 'react';
+import { getEvacuationInstructions } from '@/lib/api';
 
-export default function evacuation() {
+export default function Evacuation() {
+  const [evacuationRoutes, setEvacuationRoutes] = useState([]);
+
+  useEffect(() => {
+    const fetchEvacuationRoutes = async () => {
+      try {
+        const start = 'user_current_location'; // Replace with actual user location
+        const end = 'nearest_safe_zone'; // Replace with actual safe zone
+        const routes = await getEvacuationInstructions(start, end);
+        setEvacuationRoutes(routes);
+      } catch (error) {
+        console.error('Failed to fetch evacuation routes', error);
+      }
+    };
+    fetchEvacuationRoutes();
+  }, []);
+
   return (
     <div className="flex flex-col min-h-[100dvh]">
       <header className="px-4 lg:px-6 h-14 flex items-center justify-between border-b">
@@ -43,39 +61,19 @@ export default function evacuation() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-            <Card>
-              <CardContent className="flex items-center gap-4">
-                <div className="bg-primary rounded-full p-2">
-                  <RouteIcon className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Route A</h3>
-                  <p className="text-sm text-muted-foreground">Recommended evacuation route for your area.</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="flex items-center gap-4">
-                <div className="bg-primary rounded-full p-2">
-                  <RouteIcon className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Route B</h3>
-                  <p className="text-sm text-muted-foreground">Alternate evacuation route for your area.</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="flex items-center gap-4">
-                <div className="bg-primary rounded-full p-2">
-                  <RouteIcon className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Route C</h3>
-                  <p className="text-sm text-muted-foreground">Emergency evacuation route for your area.</p>
-                </div>
-              </CardContent>
-            </Card>
+            {evacuationRoutes.map((route, index) => (
+              <Card key={index}>
+                <CardContent className="flex items-center gap-4">
+                  <div className="bg-primary rounded-full p-2">
+                    <RouteIcon className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">{route.name}</h3>
+                    <p className="text-sm text-muted-foreground">{route.description}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </section>
         <section>

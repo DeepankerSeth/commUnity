@@ -4,8 +4,8 @@
 // Integrated with Geolib for geofencing calculations.
 
 // src/services/geofencingService.js
-const geolib = require('geolib'); // Geolib for geofencing calculations
-const { sendAlert } = require('./alertService');
+import geolib from 'geolib'; // Geolib for geofencing calculations
+import { sendAlert } from './alertService';
 
 // Function to check if a point is within a geofence
 const isWithinGeofence = (lat, lon, geofence) => {
@@ -23,5 +23,4 @@ const geofenceAlert = (location, message, geofence) => {
 };
 
 // Export the geofenceAlert function
-module.exports = { geofenceAlert };
-
+export { geofenceAlert };

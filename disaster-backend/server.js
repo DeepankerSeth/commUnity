@@ -1,19 +1,17 @@
 // server.js
-require('dotenv').config();
-const express = require('express');
-const multer = require('multer');
-const { Storage } = require('@google-cloud/storage');
-const speech = require('@google-cloud/speech');
-const mongoose = require('mongoose');
-const IncidentReport = require('./models/incidentReport');
-const app = require('./app');
+import 'dotenv/config';
+import express from 'express';
+import multer from 'multer';
+import { Storage } from '@google-cloud/storage';
+import speech from '@google-cloud/speech';
+import mongoose from 'mongoose';
+import app from './app.js';
+import { monitorIncidents } from './src/workers/monitorIncidents.js';
+import { createIncidentReport, getIncidentUpdates } from './src/ai/llmProcessor.js';
+import evacuationRoutes from './src/routes/evacuationRoutes.js';
+import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
+
 const upload = multer({ dest: 'uploads/' });
-
-// Import the monitorIncidents function
-const { monitorIncidents } = require('./workers/monitorIncidents');
-
-// Import functions from llmProcessor.js
-const { createIncidentReport, getIncidentUpdates } = require('./src/ai/llmProcessor');
 
 // Initialize Google Cloud Storage
 const storage = new Storage();
@@ -94,4 +92,7 @@ app.post('/api/incidents/voice', upload.single('audio'), async (req, res) => {
 // Start the incident monitoring worker
 monitorIncidents();
 
-module.exports = app;
+app.use('/api/evacuation', evacuationRoutes);
+app.use('/api/alert-preferences', alertPreferencesRoutes);
+
+export default app;

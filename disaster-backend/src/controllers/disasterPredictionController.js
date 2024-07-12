@@ -2,10 +2,7 @@
 // Integrating ML models for various disaster prediction
 
 
-const { fetchDisasterData } = require('../services/predictHQservice');
-
-// Function to predict disasters
-const { fetchDisasterData } = require('../services/predictHQservice');
+import { fetchDisasterData } from '../services/predictHQservice';
 
 // Function to predict disasters
 const predictDisaster = async (req, res) => {
@@ -18,4 +15,4 @@ const predictDisaster = async (req, res) => {
 };
 
 // Export the predictDisaster function
-module.exports = { predictDisaster };
+export { predictDisaster };

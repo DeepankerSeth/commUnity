@@ -1,5 +1,5 @@
-const { createIncidentReport } = require('../ai/llmProcessor');
-const { uploadFile } = require('../services/storageService');
+import { createIncidentReport } from '../ai/llmProcessor';
+import { uploadFile } from '../services/storageService';
 
 async function createIncident(req, res) {
   try {
@@ -20,4 +20,4 @@ async function createIncident(req, res) {
   }
 }
 
-module.exports = { createIncident };
+export { createIncident };

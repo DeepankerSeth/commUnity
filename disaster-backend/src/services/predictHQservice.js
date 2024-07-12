@@ -1,8 +1,8 @@
 // Purpose: Fetch data from PredictHQ API.
 
 // src/services/predictHQService.js
-const axios = require('axios');
-const NodeCache = require('node-cache'); // Added caching
+import axios from 'axios';
+import NodeCache from 'node-cache'; // Added caching
 
 const cache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
 
@@ -30,4 +30,4 @@ const fetchDisasterData = async () => {
 };
 
 // Export the fetchDisasterData function
-module.exports = { fetchDisasterData };
+export { fetchDisasterData };

@@ -1,8 +1,8 @@
-const { OpenAI } = require('langchain');
-const { PineconeStore } = require('@langchain/pinecone');
-const { Pinecone } = require('@pinecone-database/pinecone');
-const { queryVectors } = require('../db/pinecone');
-const { createIncidentReport, getIncidentUpdates } = require('./llmProcessor');
+import { OpenAI } from '@langchain/openai';
+import { PineconeStore } from '@langchain/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { queryVectors } from '../db/pinecone';
+import { createIncidentReport, getIncidentUpdates } from './llmProcessor';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pinecone = new Pinecone({
@@ -42,4 +42,4 @@ const processIncident = async (incidentData) => {
   }
 };
 
-module.exports = { processIncident };
+export { processIncident };
