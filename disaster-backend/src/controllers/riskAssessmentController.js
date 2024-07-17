@@ -4,13 +4,13 @@
 import { fetchDisasterData } from '../services/predictHQservice';
 
 // Function to assess risk
-const assessRisk = async (req, res) => {
+const assessRisk = async (req, res, next) => {
   try {
     const disasterData = await fetchDisasterData();
     const riskLevel = calculateRisk(disasterData);
     res.json({ riskLevel });
   } catch (error) {
-    res.status(500).json({ error: 'Error assessing risk' });
+    next(error);
   }
 };
 

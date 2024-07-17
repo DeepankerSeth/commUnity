@@ -6,12 +6,14 @@ import Footer from '@/components/ui/footer';
 import { Button } from "@/components/ui/button"
 import { fetchDisasterData, reportIncident } from '@/lib/api';
 import DisasterIcon from '@/components/ui/DisasterIcon';
+import useErrorHandler from '@/hooks/useErrorHandler';
 
 export default function Predictions() {
   const [disasterData, setDisasterData] = useState([]);
   const [description, setDescription] = useState('');
   const [media, setMedia] = useState<File | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const { error, handleError, clearError } = useErrorHandler();
 
   useEffect(() => {
     const getData = async () => {
@@ -19,7 +21,7 @@ export default function Predictions() {
         const data = await fetchDisasterData();
         setDisasterData(data);
       } catch (error) {
-        console.error('Failed to fetch disaster data', error);
+        handleError(error);
       }
     };
     getData();
@@ -36,7 +38,7 @@ export default function Predictions() {
       const res = await reportIncident(formData);
       alert('Incident reported successfully!');
     } catch (error) {
-      alert('Failed to report incident');
+      handleError(error);
     }
   };
 

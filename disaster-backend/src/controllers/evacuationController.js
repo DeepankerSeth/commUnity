@@ -4,14 +4,14 @@
 import { optimizeEvacuationRoute } from '../services/evacuationService';
 
 // Controller function to get evacuation instructions
-const getEvacuationInstructions = async (req, res) => {
+const getEvacuationInstructions = async (req, res, next) => {
   const { start, end } = req.body;
   try {
     // Optimize the evacuation route
     const route = await optimizeEvacuationRoute(start, end);
     res.json({ route });
   } catch (error) {
-    res.status(500).json({ error: 'Error getting evacuation instructions' });
+    next(error);
   }
 };
 

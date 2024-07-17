@@ -5,12 +5,12 @@
 import { fetchDisasterData } from '../services/predictHQservice';
 
 // Function to predict disasters
-const predictDisaster = async (req, res) => {
+const predictDisaster = async (req, res, next) => {
   try {
     const disasterData = await fetchDisasterData();
     res.json({ disasterData });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching disaster data' });
+    next(error);
   }
 };
 

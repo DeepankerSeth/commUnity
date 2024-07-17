@@ -20,6 +20,7 @@ import dotenv from 'dotenv';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import evacuationRoutes from './src/routes/evacuationRoutes.js';
 import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
+import disasterPredictionRoutes from './src/routes/disasterPredictionRoutes.js';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/evacuation', evacuationRoutes);
 app.use('/api/alert-preferences', alertPreferencesRoutes);
+app.use('/api/disaster-data', disasterPredictionRoutes);
 
 // Global error handler
 app.use(errorHandler);

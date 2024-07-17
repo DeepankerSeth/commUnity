@@ -10,6 +10,7 @@ import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import { createIncidentReport, getIncidentUpdates } from './src/ai/llmProcessor.js';
 import evacuationRoutes from './src/routes/evacuationRoutes.js';
 import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
+import cors from 'cors';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -25,9 +26,16 @@ mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTop
 
 app.use(express.json());
 
+// Add CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 /**
  * API endpoint for reporting incidents
- * Accepts photo, and file uploads along with a description
+ * Accepts media (will only support photos currently), and file uploads along with a description
  */
 
 // Report an incident
@@ -47,7 +55,7 @@ app.post('/api/incidents', upload.array('media'), async (req, res) => {
     const incidentData = { userId, type, description, latitude, longitude, mediaUrls };
     const incidentReport = await createIncidentReport(incidentData);
 
-    res.status(201).json({ message: 'Incident reported successfully', incidentId: incidentReport._id });
+    res.status(201).json({ message: 'Thanks for reporting the incident!', incidentId: incidentReport._id });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'An error occurred while reporting the incident' });
