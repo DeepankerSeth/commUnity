@@ -1,18 +1,20 @@
 // pages/predictions
 'use client';
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Footer from '@/components/ui/footer';
 import { Button } from "@/components/ui/button"
-import { fetchDisasterData, reportIncident } from '@/lib/api';
+import { fetchDisasterData } from '@/lib/api';
 import DisasterIcon from '@/components/ui/DisasterIcon';
 import useErrorHandler from '@/hooks/useErrorHandler';
 
+interface Disaster {
+  type: string;
+  predictionTime: string;
+}
+
 export default function Predictions() {
-  const [disasterData, setDisasterData] = useState([]);
-  const [description, setDescription] = useState('');
-  const [media, setMedia] = useState<File | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [disasterData, setDisasterData] = useState<Disaster[]>([]);
   const { error, handleError, clearError } = useErrorHandler();
 
   useEffect(() => {
@@ -25,22 +27,7 @@ export default function Predictions() {
       }
     };
     getData();
-  }, []);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData();
-    formData.append('description', description);
-    if (media) formData.append('media', media);
-    if (file) formData.append('file', file);
-
-    try {
-      const res = await reportIncident(formData);
-      alert('Incident reported successfully!');
-    } catch (error) {
-      handleError(error);
-    }
-  };
+  }, [handleError]); // Add handleError to the dependency array
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -126,43 +113,9 @@ export default function Predictions() {
           </section>
           <section className="mt-12">
             <h2 className="text-2xl font-bold mb-4">Report an Incident</h2>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex items-center">
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe the incident"
-                    className="w-full border rounded-lg p-2"
-                    required
-                  />
-                  <Button variant="secondary" size="icon" className="ml-4">
-                    <MicIcon className="w-6 h-6" />
-                  </Button>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Upload Photos, Videos</label>
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    capture="environment"
-                    onChange={(e) => setMedia(e.target.files ? e.target.files[0] : null)}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Any other files</label>
-                  <input
-                    type="file"
-                    onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                  />
-                </div>
-                <Button type="submit" className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded">
-                  Submit
-                </Button>
-              </form>
-            </div>
+            <Link href="/report_incident" className="text-primary hover:underline">
+              Go to Report an Incident Page
+            </Link>
           </section>
         </div>
       </main>
@@ -208,25 +161,4 @@ function CompassIcon(props: any) {
       <circle cx="12" cy="12" r="10" />
     </svg>
   );
-}
-
-function MicIcon(props:any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" x2="12" y1="19" y2="22" />
-    </svg>
-  )
 }

@@ -16,9 +16,13 @@ const isWithinGeofence = (lat, lon, geofence) => {
 };
 
 // Function to send geofence alerts
-const geofenceAlert = (location, message, geofence) => {
+const geofenceAlert = async (location, message, geofence) => {
   if (isWithinGeofence(location.latitude, location.longitude, geofence)) {
-    sendAlert(message, [{ type: 'sms', to: location.phoneNumber }]);
+    try {
+      await sendAlert(message, [{ type: 'sms', to: location.phoneNumber }]);
+    } catch (error) {
+      console.error('Error sending geofence alert:', error);
+    }
   }
 };
 

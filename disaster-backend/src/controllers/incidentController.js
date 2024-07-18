@@ -15,7 +15,7 @@ async function createIncident(req, res) {
 
     res.status(201).json(incident);
   } catch (error) {
-    console.error(error);
+    console.error('Error creating incident:', error);
     res.status(500).json({ error: 'Failed to create incident' });
   }
 }

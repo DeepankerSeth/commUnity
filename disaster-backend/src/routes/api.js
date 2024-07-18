@@ -1,5 +1,8 @@
 import express from 'express';
 import { fetchDisasterData } from '../services/predictHQservice.js';
+import createIncidentReport from './createIncidentReport.js';
+import getIncidentUpdates from './getIncidentUpdates.js';
+import userLocation from './userLocation.js';
 
 const router = express.Router();
 

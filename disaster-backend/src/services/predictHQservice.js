@@ -21,6 +21,11 @@ const fetchDisasterData = async () => {
         Authorization: `Bearer ${process.env.PREDICTHQ_API_KEY}`,
       },
     });
+
+    if (response.status !== 200) {
+      throw new Error('Failed to fetch data from PredictHQ');
+    }
+
     cache.set(cacheKey, response.data); // Cache the response data
     return response.data;
   } catch (error) {

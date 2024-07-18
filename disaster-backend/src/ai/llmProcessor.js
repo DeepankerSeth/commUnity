@@ -120,28 +120,8 @@ Analyze the combined reports and provide a comprehensive update on the incident.
 export async function createIncidentReport(incidentData) {
   const { userId, type, description, latitude, longitude, mediaUrls } = incidentData;
 
-  // Create vector embedding
-  const embedding = await generateEmbedding(`${type} ${description}`);
-
-   // Store vector in Pinecone
-   const vectorId = incidentReport._id.toString();
-   await vectorStore.addDocuments([
-     {
-       id: vectorId,
-       values: embedding,
-       metadata: { 
-         type, 
-         description, 
-         latitude, 
-         longitude,
-         reportId: incidentReport._id
-       }
-    }
-  ]);
-
   // Create incident report in MongoDB
   const incidentReport = new IncidentReport({
-    id: vectorId,
     userId,
     type,
     description,
@@ -153,6 +133,24 @@ export async function createIncidentReport(incidentData) {
   });
   await incidentReport.save();
 
+  // Create vector embedding
+  const embedding = await generateEmbedding(`${type} ${description}`);
+
+  // Store vector in Pinecone
+  const vectorId = incidentReport._id.toString();
+  await vectorStore.addDocuments([
+    {
+      id: vectorId,
+      values: embedding,
+      metadata: { 
+        type, 
+        description, 
+        latitude, 
+        longitude,
+        reportId: incidentReport._id
+      }
+    }
+  ]);
 
   // Update incident report with vector ID
   incidentReport.vectorId = vectorId;

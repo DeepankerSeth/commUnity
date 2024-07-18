@@ -16,12 +16,25 @@ const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
-const vectorStore = await PineconeStore.fromExistingIndex(
-  new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
-  { pineconeIndex }
-);
+let vectorStore;
+
+async function initializeVectorStore() {
+  if (!vectorStore) {
+    vectorStore = await PineconeStore.fromExistingIndex(
+      new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
+      { pineconeIndex }
+    );
+  }
+}
+
+let isMonitoring = false;
 
 async function monitorIncidents() {
+  await initializeVectorStore();
+
+  if (isMonitoring) return;
+  isMonitoring = true;
+
   try {
     const recentIncidents = await IncidentReport.find({
       createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes
@@ -49,6 +62,8 @@ async function monitorIncidents() {
     }
   } catch (error) {
     console.error('Error in incident monitoring:', error);
+  } finally {
+    isMonitoring = false;
   }
 }
 

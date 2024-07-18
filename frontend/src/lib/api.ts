@@ -31,3 +31,31 @@ export async function updateAlertPreferences(userId: string, preferences: any) {
   return response.data;
 }
 
+export async function searchNonprofits(searchTerm: string) {
+  const response = await api.get(`/charities/search/${searchTerm}`);
+  return response.data;
+}
+
+export async function getNonprofitDetails(identifier: string) {
+  const response = await api.get(`/charities/details/${identifier}`);
+  return response.data;
+}
+
+export async function createFundraiser(nonprofitId: string, title: string, description: string) {
+  const response = await api.post('/charities/fundraiser', { nonprofitId, title, description });
+  return response.data;
+}
+
+export async function generateDonateLink(data: any) {
+  const response = await api.post('/charities/donate-link', data);
+  return response.data;
+}
+
+// function to fetch nearby incidents
+export async function fetchNearbyIncidents(latitude: number, longitude: number, maxDistance: number = 5000) {
+  const response = await fetch(`/api/incidents/nearby?latitude=${latitude}&longitude=${longitude}&maxDistance=${maxDistance}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch nearby incidents');
+  }
+  return response.json();
+}
