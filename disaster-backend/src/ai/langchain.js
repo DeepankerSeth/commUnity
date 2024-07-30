@@ -16,30 +16,43 @@ const vectorStore = await PineconeStore.fromExistingIndex(
   { pineconeIndex }
 );
 
-const processIncident = async (incidentData) => {
-  try {
-    // Create incident report
-    const incidentReport = await createIncidentReport(incidentData);
+const processIncident = async (incident) => {
+  const { description, type, latitude, longitude, mediaUrls } = incident;
 
-    // Retrieve similar incidents from Pinecone
-    const similarIncidents = await vectorStore.similaritySearch(
-      `${incidentData.type} ${incidentData.description}`,
-      5,
-      { reportId: { $ne: incidentReport._id.toString() } }
-    );
+  const prompt = `
+Incident Description: ${description}
+Incident Type: ${type}
+Location: Latitude ${latitude}, Longitude ${longitude}
+Media URLs: ${mediaUrls.join(', ')}
 
-    // Analyze similar incidents with OpenAI
-    const prompt = `Analyze these incidents: ${JSON.stringify(similarIncidents)} and provide a comprehensive understanding.`;
-    const response = await openai.completions.create({
-      model: "gpt-4",
-      prompt,
-    });
+Analyze this incident report and provide the following:
+1. A detailed picture of the incident including any connections or relevant context.
+2. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic.
+3. Estimate the potential impact radius in miles.
+4. List any immediate risks or dangers associated with this incident.
+5. Suggest any immediate actions that should be taken by authorities or the public.
+`;
 
-    return response.choices[0].text;
-  } catch (error) {
-    console.error('Error processing incident:', error);
-    throw new Error('Failed to process incident');
-  }
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [
+      { role: 'system', content: 'You are a disaster response AI assistant.' },
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: 1000,
+  });
+
+  const analysis = response.choices[0].message.content;
+  
+  // Extract severity and impact radius using regex
+  const severityMatch = analysis.match(/Severity: (\d+)/);
+  const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
+  
+  return {
+    analysis,
+    severity: severityMatch ? parseInt(severityMatch[1]) : 5, // Default to 5 if not found
+    impactRadius: radiusMatch ? parseFloat(radiusMatch[1]) : 2 // Default to 2 mile if not found
+  };
 };
 
 export { processIncident };

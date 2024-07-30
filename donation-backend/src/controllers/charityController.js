@@ -2,13 +2,13 @@ const axios = require('axios');
 const { validationResult } = require('express-validator');
 
 const EVERY_ORG_BASE_URL = 'https://partners.every.org/v0.2';
-const PUBLIC_KEY = process.env.EVERY_ORG_PUBLIC_KEY;
 const PRIVATE_KEY = process.env.EVERY_ORG_PRIVATE_KEY;
 
 const everyorgClient = axios.create({
   baseURL: EVERY_ORG_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${PRIVATE_KEY}`
   },
 });
 
@@ -23,7 +23,9 @@ exports.searchNonprofits = async (req, res, next) => {
     }
 
     const { searchTerm } = req.params;
-    const data = await everyorgService.searchNonprofits(searchTerm);
+    const { take, causes } = req.query;
+    const apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
+    const data = await everyorgService.searchNonprofits(searchTerm, apiKey, take, causes);
     logger.info(`Successfully searched nonprofits with term: ${searchTerm}`);
     res.json(data);
   } catch (error) {
@@ -40,7 +42,8 @@ exports.getNonprofitDetails = async (req, res, next) => {
     }
 
     const { identifier } = req.params;
-    const data = await everyorgService.getNonprofitDetails(identifier);
+    const apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
+    const data = await everyorgService.getNonprofitDetails(identifier, apiKey);
     logger.info(`Successfully retrieved nonprofit details for identifier: ${identifier}`);
     res.json(data);
   } catch (error) {
@@ -56,9 +59,10 @@ exports.createFundraiser = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { nonprofitId, title, description } = req.body;
-    const data = await everyorgService.createFundraiser(nonprofitId, title, description);
-    logger.info(`Successfully created fundraiser for nonprofit ID: ${nonprofitId}`);
+    const fundraiserData = req.body;
+    const apiKey = process.env.EVERY_ORG_PRIVATE_KEY;
+    const data = await everyorgService.createFundraiser(fundraiserData, apiKey);
+    logger.info(`Successfully created fundraiser for nonprofit ID: ${fundraiserData.nonprofitId}`);
     res.json(data);
   } catch (error) {
     logger.error(`Error in createFundraiser: ${error.message}`, { error });

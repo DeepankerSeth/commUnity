@@ -4,8 +4,11 @@ import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
-import { getIncidentUpdates } from '../ai/llmProcessor.js';
+import { getIncidentUpdates, processIncident } from '../ai/llmProcessor.js';
 import { OpenAI } from '@langchain/openai';
+import { calculateDynamicImpactZone } from '../services/incidentAnalysisService';
+import { generateNotification, sendNotification } from '../services/notificationService';
+import User from '../models/userModel';
 
 dotenv.config();
 
@@ -41,23 +44,46 @@ async function monitorIncidents() {
     });
 
     for (const incident of recentIncidents) {
-      const similarIncidents = await vectorStore.similaritySearch(
-        `${incident.type} ${incident.description}`,
-        2,
-        { reportId: { $ne: incident._id.toString() } }
-      );
+      const similarIncidents = await IncidentReport.find({
+        type: incident.type,
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [incident.longitude, incident.latitude]
+            },
+            $maxDistance: 1000 // 1km radius
+          }
+        },
+        _id: { $ne: incident._id }
+      }).sort({ createdAt: -1 }).limit(1);
 
-      if (similarIncidents.length >= 2) {
-        // Send notification (implement your notification logic here)
-        console.log(`Alert: Multiple reports for incident type ${incident.type} in the same area`);
-
-        // Update incident status
-        incident.status = 'active';
+      if (similarIncidents.length > 0) {
+        const analysis = await processIncident(incident);
+        incident.analysis = analysis.analysis;
+        incident.severity = analysis.severity;
+        incident.impactRadius = analysis.impactRadius;
         await incident.save();
 
-        // Get comprehensive update using LLM
-        const analysis = await getIncidentUpdates(incident._id);
-        console.log(`Incident Analysis: ${analysis}`);
+        const nearbyUsers = await User.find({
+          location: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [incident.longitude, incident.latitude]
+              },
+              $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
+            }
+          }
+        });
+
+        for (const user of nearbyUsers) {
+          const notification = generateNotification(incident, user.location);
+          await sendNotification(user, notification);
+        }
+
+        // Emit updated incident data to all connected clients
+        emitIncidentUpdate(incident._id, incident);
       }
     }
   } catch (error) {

@@ -5,11 +5,11 @@
 // Added CORS for cross-origin requests.
 // Added comments for clarity.
 
+import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bodyParser from 'body-parser';
 import cors from 'cors'; // Added CORS for cross-origin requests
-import express from 'express';
 import connectDB from './src/db/mongodb.js';
 import apiGateway from './src/middleware/apiGateway.js';
 import dashboardRoutes from './src/routes/dashboard.js';
@@ -18,24 +18,14 @@ import incidentRoutes from './src/routes/incidentRoutes.js';
 import errorHandler from './src/middleware/errorHandler.js';
 import dotenv from 'dotenv';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
-import evacuationRoutes from './src/routes/evacuationRoutes.js';
-import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
-import disasterPredictionRoutes from './src/routes/disasterPredictionRoutes.js';
 import userLocationRoutes from './src/routes/userLocation.js';
-
-dotenv.config();
+import { createServer } from 'http';
+import { initializeSocket } from './src/services/socketService.js';
+import { passport, authRoutes } from 'auth-service'; // Added import for auth-service
 
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Connect to database
-connectDB().then(() => {
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
-}).catch(err => {
-  console.error('Failed to connect to MongoDB', err);
-});
+dotenv.config();
 
 app.use(bodyParser.json());
 app.use('/incidents', incidentRoutes);
@@ -65,15 +55,25 @@ app.use(express.static('public'));
 app.use('/api', apiGateway);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/incidents', incidentRoutes);
-app.use('/api/evacuation', evacuationRoutes);
-app.use('/api/alert-preferences', alertPreferencesRoutes);
-app.use('/api/disaster-data', disasterPredictionRoutes);
-app.use('/api/location', userLocationRoutes);
+app.use('/api/location', userLocationRoutes); // Using the imported userLocationRoutes
+
+// Use Passport middleware
+app.use(passport.initialize()); // Added for auth-service
+
+// Use authentication routes
+app.use('/auth', authRoutes); // Added for auth-service
 
 // Global error handler
 app.use(errorHandler);
 
 // Start the incident monitoring worker
-monitorIncidents();
+setInterval(monitorIncidents, 5 * 60 * 1000); // Run every 5 minutes
+
+const server = createServer(app);
+initializeSocket(server);
+
+server.listen(process.env.PORT || 3001, () => {
+  console.log(`Server started on port ${process.env.PORT || 3001}`);
+});
 
 export default app;

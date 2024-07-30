@@ -4,9 +4,9 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import Footer from "@/components/ui/footer"
+import Footer from "@/components/Footer"
 import { useState, useEffect } from 'react';
-import { getEvacuationInstructions } from '@/lib/api';
+import { getEvacuationInstructions } from '@/lib/donationAPI';
 
 type EvacuationRoute = {
   name: string;

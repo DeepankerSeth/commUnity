@@ -5,6 +5,8 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
 import { uploadFile } from '../services/storageService.js';
+import { analyzeMedia } from '../services/mediaAnalysisService.js';
+import { emitIncidentUpdate } from '../services/socketService.js';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -54,24 +56,42 @@ export async function generateEmbedding(text) {
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
 export async function processIncident(incident) {
-  const { description, photo, video, file } = incident;
+  const { description, type, latitude, longitude, mediaUrls } = incident;
 
-  // Construct prompt for LLM
   const prompt = `
 Incident Description: ${description}
-${photo ? `Photo: [attached]` : ''}
-${file ? `File: [attached]` : ''}
-Analyze this incident report and provide a detailed picture of the incident including any connections or relevant context.
-  `;
+Incident Type: ${type}
+Location: Latitude ${latitude}, Longitude ${longitude}
+Media URLs: ${mediaUrls.join(', ')}
 
-  // Get analysis from OpenAI
-  const response = await openai.createCompletion({
+Analyze this incident report and provide the following:
+1. A detailed picture of the incident including any connections or relevant context.
+2. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic.
+3. Estimate the potential impact radius in miles.
+4. List any immediate risks or dangers associated with this incident.
+5. Suggest any immediate actions that should be taken by authorities or the public.
+`;
+
+  const response = await openai.chat.completions.create({
     model: 'gpt-4',
-    prompt,
-    max_tokens: 500,
+    messages: [
+      { role: 'system', content: 'You are a disaster response AI assistant.' },
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: 1000,
   });
 
-  return response.data.choices[0].text;
+  const analysis = response.choices[0].message.content;
+  
+  // Extract severity and impact radius using regex
+  const severityMatch = analysis.match(/Severity: (\d+)/);
+  const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
+  
+  return {
+    analysis,
+    severity: severityMatch ? parseInt(severityMatch[1]) : 5, // Default to 5 if not found
+    impactRadius: radiusMatch ? parseFloat(radiusMatch[1]) : 1 // Default to 1 mile if not found
+  };
 }
 
 /**
@@ -88,26 +108,23 @@ export async function updateIncident(incidentId, newReport) {
     throw new Error('Incident not found');
   }
 
-  // Combine existing description with new report
-  const combinedDescription = `${existingIncident.description}\n\n${newReport.description}`;
-  const prompt = `
-Incident Description: ${combinedDescription}
-Analyze the combined reports and provide a comprehensive update on the incident.
-  `;
-
-  // Get updated analysis from OpenAI
-  const response = await openai.createCompletion({
-    model: 'gpt-4',
-    prompt,
-    max_tokens: 500,
-  });
-
-  const updatedAnalysis = response.data.choices[0].text;
+  const combinedDescription = `${existingIncident.description}\n\nUpdate: ${newReport.description}`;
+  const updatedIncident = { ...existingIncident.toObject(), description: combinedDescription };
+  
+  const analysis = await processIncident(updatedIncident);
 
   // Update incident in MongoDB
   existingIncident.description = combinedDescription;
-  existingIncident.analysis = updatedAnalysis;
+  existingIncident.analysis = analysis.analysis;
+  existingIncident.severity = analysis.severity;
+  existingIncident.impactRadius = analysis.impactRadius;
   await existingIncident.save();
+
+  // Trigger re-evaluation of notifications
+  monitorIncidents();
+
+  // Emit incident update to connected clients
+  emitIncidentUpdate(incidentId, existingIncident);
 
   return existingIncident;
 }
@@ -120,11 +137,29 @@ Analyze the combined reports and provide a comprehensive update on the incident.
 export async function createIncidentReport(incidentData) {
   const { userId, type, description, latitude, longitude, mediaUrls } = incidentData;
 
+  // Analyze media content
+  const mediaAnalyses = await Promise.all(mediaUrls.map(async (url) => {
+    const fileExtension = path.extname(url).toLowerCase();
+    let mediaType;
+    if (['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif'].includes(fileExtension)) {
+      mediaType = 'image';
+    } else if (['.mp4', '.avi', '.mov', '.mpg', '.mpeg', '.mpg4', '.m4v', '.mp4a', '.mp4v'].includes(fileExtension)) {
+      mediaType = 'video';
+    } else if (['.mp3', '.wav', '.ogg', '.mpga', '.m4a', '.mp4a'].includes(fileExtension)) {
+      mediaType = 'audio';
+    } else {
+      mediaType = 'file';
+    }
+    return await analyzeMedia(url, mediaType);
+  }));
+
+  const combinedDescription = `${description}\n\nMedia Analyses:\n${mediaAnalyses.join('\n')}`;
+
   // Create incident report in MongoDB
   const incidentReport = new IncidentReport({
     userId,
     type,
-    description,
+    description: combinedDescription,
     location: {
       type: 'Point',
       coordinates: [parseFloat(longitude), parseFloat(latitude)]
@@ -134,7 +169,7 @@ export async function createIncidentReport(incidentData) {
   await incidentReport.save();
 
   // Create vector embedding
-  const embedding = await generateEmbedding(`${type} ${description}`);
+  const embedding = await generateEmbedding(`${type} ${combinedDescription}`);
 
   // Store vector in Pinecone
   const vectorId = incidentReport._id.toString();
@@ -144,7 +179,7 @@ export async function createIncidentReport(incidentData) {
       values: embedding,
       metadata: { 
         type, 
-        description, 
+        description: combinedDescription, 
         latitude, 
         longitude,
         reportId: incidentReport._id

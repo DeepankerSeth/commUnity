@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import Footer from "@/components/ui/footer"
-import { searchNonprofits, getNonprofitDetails, generateDonateLink } from '@/lib/api';
+import Footer from "@/components/Footer"
+import { searchNonprofits, getNonprofitDetails, generateDonateLink } from '@/lib/donationAPI';
 import { Nonprofit, NonprofitDetails, DonateLinkRequest } from '@/types/charity';
 
 export default function Donate() {
@@ -21,8 +21,10 @@ export default function Donate() {
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
+    console.log('Search term:', searchTerm); // Log the search term
     try {
       const results = await searchNonprofits(searchTerm);
+      console.log('Search results:', results); // Log the search results
       setNonprofits(results.nonprofits);
     } catch (error) {
       console.error('Error searching nonprofits:', error);

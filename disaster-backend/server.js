@@ -7,22 +7,30 @@ import speech from '@google-cloud/speech';
 import mongoose from 'mongoose';
 import app from './app.js';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
-import { createIncidentReport, getIncidentUpdates } from './src/ai/llmProcessor.js';
-import evacuationRoutes from './src/routes/evacuationRoutes.js';
-import alertPreferencesRoutes from './src/routes/alertPreferencesRoutes.js';
+import { createIncidentReport, getIncidentUpdates, processIncident } from './src/ai/llmProcessor.js';
 import cors from 'cors';
-
-const upload = multer({ dest: 'uploads/' });
+import { initializeSocket } from './src/services/socketService';
+import { checkSimilarIncidentsAndNotify } from './src/services/notificationService';
 
 // Initialize Google Cloud Storage
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+});
 
 // Initialize Google Cloud Speech-to-Text client
 const speechClient = new speech.SpeechClient();
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const port = process.env.PORT || 0;
+const server = http.createServer(app);
+initializeSocket(server);
 
 app.use(express.json());
 
@@ -39,26 +47,49 @@ app.use(cors({
  */
 
 // Report an incident
-app.post('/api/incidents', upload.array('media'), async (req, res) => {
+app.post('/api/incidents', upload.array('media', 5), async (req, res) => {
   try {
     const { userId, type, description, latitude, longitude } = req.body;
     const mediaFiles = req.files;
 
     // Upload media files to Google Cloud Storage
     const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
-      const blob = bucket.file(file.originalname);
-      await blob.save(file.buffer);
-      return blob.publicUrl();
+      const blob = bucket.file(`${Date.now()}-${file.originalname}`);
+      const blobStream = blob.createWriteStream();
+
+      return new Promise((resolve, reject) => {
+        blobStream.on('error', (err) => reject(err));
+        blobStream.on('finish', () => resolve(blob.publicUrl()));
+        blobStream.end(file.buffer);
+      });
     }));
 
     // Create incident report
     const incidentData = { userId, type, description, latitude, longitude, mediaUrls };
     const incidentReport = await createIncidentReport(incidentData);
 
-    res.status(201).json({ message: 'Thanks for reporting the incident!', incidentId: incidentReport._id });
+    // Process the incident
+    const analysis = await processIncident(incidentReport);
+
+    // Update the incident report with the analysis
+    incidentReport.analysis = analysis.analysis;
+    incidentReport.severity = analysis.severity;
+    incidentReport.impactRadius = analysis.impactRadius;
+    await incidentReport.save();
+
+    // Check for similar incidents and send notifications if necessary
+    await checkSimilarIncidentsAndNotify(incidentReport);
+
+    res.status(201).json({ 
+      message: 'Incident reported and analyzed successfully', 
+      incidentId: incidentReport._id,
+      analysis: analysis.analysis,
+      severity: analysis.severity,
+      impactRadius: analysis.impactRadius
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'An error occurred while reporting the incident' });
+    res.status(500).json({ error: 'An error occurred while reporting and analyzing the incident' });
   }
 });
 
@@ -99,8 +130,5 @@ app.post('/api/incidents/voice', upload.single('audio'), async (req, res) => {
 
 // Start the incident monitoring worker
 monitorIncidents();
-
-app.use('/api/evacuation', evacuationRoutes);
-app.use('/api/alert-preferences', alertPreferencesRoutes);
 
 export default app;

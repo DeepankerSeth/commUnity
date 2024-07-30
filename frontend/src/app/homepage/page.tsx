@@ -1,14 +1,30 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Footer from "@/components/ui/footer";
 import ReportIncidentForm from "@/components/ReportIncidentForm";
+import { getIncidents } from '@/lib/disasterAPI';
+import { Input } from "@/components/ui/input";
+import Image from "next/image";
+import Footer from "@/components/Footer";
 
 export default function Homepage() {
   const [showReportIncident, setShowReportIncident] = useState(false);
   const reportIncidentRef = useRef<HTMLDivElement>(null);
+  const [incidents, setIncidents] = useState([]);
+
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      try {
+        const data = await getIncidents();
+        setIncidents(data);
+      } catch (error) {
+        console.error('Failed to fetch incidents:', error);
+      }
+    };
+    fetchIncidents();
+  }, []);
 
   const toggleReportIncident = () => {
     setShowReportIncident(prevState => !prevState);
@@ -18,101 +34,50 @@ export default function Homepage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-background px-4 py-12 sm:px-6 lg:px-8">
-      <div className="space-y-4 text-center">
-        <h1 className="text-4xl font-bold tracking-tighter text-foreground sm:text-6xl">Hello</h1>
-        <p className="text-xl text-muted-foreground">Welcome to the commUnity website.</p>
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            onClick={toggleReportIncident}
-            className="inline-flex items-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-          >
+    <div className="flex flex-col items-center justify-between min-h-screen bg-white px-4 py-16 sm:px-6 lg:px-8">
+      <div className="w-full max-w-xl space-y-16">
+        <div className="text-center">
+          <h1 className="text-5xl font-bold tracking-tight text-gray-900">commUnity</h1>
+          <p className="mt-4 text-lg text-gray-600">United in Resilience</p>
+        </div>
+        <div className="mt-12">
+          <Input type="search" placeholder="Search incidents or locations" className="w-full h-12 px-4 rounded-full shadow-sm text-lg" />
+        </div>
+        <div className="flex flex-col gap-6 mt-12">
+          <Button onClick={toggleReportIncident} className="w-full h-12 bg-black text-white hover:bg-gray-800 text-lg">
             Report an Incident
           </Button>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="bg-gradient-to-r from-red-500 to-yellow-500 text-white hover:from-red-600 hover:to-yellow-600"
-          >
-            <MicIcon className="w-4 h-4" />
-            <span className="sr-only">Voice</span>
-          </Button>
+          <div className="flex justify-between gap-4">
+            <Link href="/monitor" passHref className="flex-1">
+              <Button variant="outline" className="w-full h-12 text-lg">Monitor</Button>
+            </Link>
+            <Link href="/evacuation" passHref className="flex-1">
+              <Button variant="outline" className="w-full h-12 text-lg">Evacuation</Button>
+            </Link>
+            <Link href="/donate" passHref className="flex-1">
+              <Button variant="outline" className="w-full h-12 text-lg">Donate</Button>
+            </Link>
+          </div>
         </div>
       </div>
-      <div className="mt-12 flex gap-4">
-        <Link
-          href="/monitor"
-          className="inline-flex items-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-          prefetch={false}
-        >
-          Monitor
-        </Link>
-        <Link
-          href="/predictions"
-          className="inline-flex items-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-          prefetch={false}
-        >
-          Predictions
-        </Link>
-        <Link
-          href="/evacuation"
-          className="inline-flex items-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-          prefetch={false}
-        >
-          Evacuation
-        </Link>
-        <Link
-          href="/donate"
-          className="inline-flex items-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          prefetch={false}
-        >
-          Donate to a Cause
-        </Link>
-      </div>
+      {incidents.length > 0 && (
+        <div className="mt-16 w-full max-w-xl">
+          <h2 className="text-2xl font-semibold mb-6 text-gray-900">Recent Incidents</h2>
+          <ul className="space-y-4">
+            {incidents.slice(0, 3).map((incident: any) => (
+              <li key={incident.id} className="p-4 bg-gray-100 rounded-lg shadow-sm">
+                <span className="font-semibold">{incident.type}</span> - {incident.location}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {showReportIncident && (
-        <div className="mt-12 w-full" ref={reportIncidentRef}>
+        <div className="mt-16 w-full max-w-xl" ref={reportIncidentRef}>
           <ReportIncidentForm />
         </div>
       )}
-      <footer style={{ position: "fixed", bottom: 0, width:"100%" }} className="bg-muted py-6 px-6 border-t">
-        <div className="container mx-auto max-w-5xl flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            &copy; 2024 commUnity. All rights reserved.
-          </p>
-          <nav className="flex items-center gap-4">
-            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Privacy
-            </Link>
-            <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Terms
-            </Link>
-            <Link href="/contact" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-              Contact
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <Footer />
     </div>
-  );
-}
-
-function MicIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" x2="12" y1="19" y2="22" />
-    </svg>
   );
 }
