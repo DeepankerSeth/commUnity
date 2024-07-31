@@ -2,27 +2,39 @@ import axios from '../services/authService';
 
 const DONATION_API_URL = process.env.NEXT_PUBLIC_DONATION_API_URL || 'http://localhost:3001';
 
+const api = axios.create({
+  baseURL: DONATION_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const searchNonprofits = async (searchTerm: string, take?: number, causes?: string) => {
-  const response = await axios.get(`${DONATION_API_URL}/api/charities/search/${searchTerm}`, {
+  const response = await api.get(`/api/charities/search/${searchTerm}`, {
     params: { take, causes }
   });
   return response.data;
 };
 
 export const getNonprofitDetails = async (nonprofitId: string) => {
-  const response = await axios.get(`${DONATION_API_URL}/api/charities/${nonprofitId}`);
+  const response = await api.get(`/api/charities/${nonprofitId}`);
   return response.data;
 };
 
 export const createFundraiser = async (nonprofitId: string, title: string, description: string) => {
-  const response = await axios.post(`${DONATION_API_URL}/api/charities/fundraiser`, {
+  const response = await api.post(`/api/charities/fundraiser`, {
     nonprofitId, title, description
   });
   return response.data;
 };
 
 export const generateDonateLink = async (request: DonateLinkRequest) => {
-  const response = await axios.post(`${DONATION_API_URL}/api/charities/donate-link`, request);
+  const response = await api.post(`/api/charities/donate-link`, request);
   return response.data.donateLink;
 };
 

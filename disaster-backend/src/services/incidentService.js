@@ -1,5 +1,6 @@
 import IncidentReport from '../models/incidentReport';
 import { emitIncidentUpdate } from './socketService';
+import { updateRiskScoring } from './riskScoringService';
 
 export async function updateIncidentBasedOnFeedback(incidentId, accuracy, usefulness) {
   const incident = await IncidentReport.findById(incidentId);

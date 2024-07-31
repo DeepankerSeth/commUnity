@@ -1,22 +1,30 @@
 import { Server } from 'socket.io';
-import http from 'http';
+import jwt from 'jsonwebtoken';
 
 let io;
 
-export const initializeSocket = (app) => {
-  const server = http.createServer(app);
+export const initializeSocket = (server) => {
   io = new Server(server);
   
-  io.on('connection', (socket) => {
-    console.log('A user connected');
-    
-    socket.on('authenticate', (userId) => {
-      socket.join(userId);
-      console.log(`User ${userId} authenticated`);
+  io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication error'));
+    }
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) return next(new Error('Authentication error'));
+      socket.userId = decoded.id;
+      next();
     });
+  });
+
+  io.on('connection', (socket) => {
+    console.log(`User ${socket.userId} connected`);
+    
+    socket.join(socket.userId);
     
     socket.on('disconnect', () => {
-      console.log('User disconnected');
+      console.log(`User ${socket.userId} disconnected`);
     });
   });
 };

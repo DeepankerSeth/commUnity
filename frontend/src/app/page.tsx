@@ -1,14 +1,12 @@
-import Image from "next/image";
+'use client';
+
 import Homepage from "./Homepage/page";
-import Link from "next/link";
-import Layout from "./layout";
+import Providers from "@/components/Providers";
 
 export default function Page() {
   return (
-    <div>
-      <Layout>
-        <Homepage />
-      </Layout>
-    </div>
+    <Providers>
+      <Homepage />
+    </Providers>
   );
 }

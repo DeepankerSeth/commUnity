@@ -1,24 +1,18 @@
 import express from 'express';
-import { createIncidentReport, getIncidentUpdates, getIncidentTimeline } from '../ai/llmProcessor.js';
+import { getIncidentUpdates, getIncidentTimeline } from '../ai/llmProcessor.js';
 import userLocation from './userLocation.js';
 import { authenticateUser } from '../middleware/auth.js';
 import { getClusterData } from '../services/clusteringService.js';
 import { generateStatistics } from '../services/statisticsService.js';
 import { addGeofence, removeGeofence, updateGeofence } from '../services/geofencingService.js';
+import { updateIncidentBasedOnFeedback } from '../services/incidentService.js';
+import { createIncident } from '../controllers/incidentController';
 
 const router = express.Router();
 
-router.post('/incidents', async (req, res) => {
-  try {
-    const incidentData = req.body;
-    const incident = await createIncidentReport(incidentData);
-    res.status(201).json(incident);
-  } catch (error) {
-    res.status(500).json({ error: 'Error creating incident report' });
-  }
-});
+router.post('/incidents', authenticateUser, upload.array('media', 5), createIncident);
 
-router.get('/incidents/:id/updates', async (req, res) => {
+router.get('/incidents/:id/updates', authenticateUser, async (req, res) => {
   try {
     const incidentId = req.params.id;
     const updates = await getIncidentUpdates(incidentId);
@@ -28,7 +22,7 @@ router.get('/incidents/:id/updates', async (req, res) => {
   }
 });
 
-router.get('/notifications', async (req, res) => {
+router.get('/notifications', authenticateUser, async (req, res) => {
   try {
     // TODO: Implement user authentication and fetch notifications for the authenticated user
     const notifications = await Notification.find().sort({ createdAt: -1 }).limit(10);

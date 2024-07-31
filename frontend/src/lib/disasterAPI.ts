@@ -2,64 +2,76 @@ import axios from '../services/authService';
 
 const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3002';
 
+const api = axios.create({
+  baseURL: DISASTER_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const reportIncident = async (formData: FormData) => {
-  const response = await axios.post(`${DISASTER_API_URL}/incidents/report`, formData);
+  const response = await api.post('/incidents/report', formData);
   return response.data;
 };
 
 export const getIncidents = async () => {
-  const response = await axios.get(`${DISASTER_API_URL}/incidents`);
+  const response = await api.get('/incidents');
   return response.data;
 };
 
 export const getIncidentUpdates = async (incidentId: string) => {
-  const response = await axios.get(`${DISASTER_API_URL}/incidents/${incidentId}/updates`);
+  const response = await api.get(`/incidents/${incidentId}/updates`);
   return response.data;
 };
 
 export const getEvacuationInstructions = async (start: string, end: string) => {
-  const response = await axios.post(`${DISASTER_API_URL}/evacuation`, { start, end });
+  const response = await api.post('/evacuation', { start, end });
   return response.data;
 };
 
 export const updateAlertPreferences = async (userId: string, preferences: any) => {
-  const response = await axios.post(`${DISASTER_API_URL}/alert-preferences`, { userId, preferences });
+  const response = await api.post('/alert-preferences', { userId, preferences });
   return response.data;
 };
 
 export const updateUserLocation = async (locationData: any) => {
-  const response = await axios.post(`${DISASTER_API_URL}/user-location`, locationData);
+  const response = await api.post('/user-location', locationData);
   return response.data;
 };
 
 export const getNearbyIncidents = async (latitude: number, longitude: number, maxDistance: number = 5000) => {
-  const response = await axios.get(`${DISASTER_API_URL}/incidents/nearby`, {
+  const response = await api.get('/incidents/nearby', {
     params: { latitude, longitude, maxDistance }
   });
   return response.data;
 };
 
 export const fetchDisasterData = async () => {
-  const response = await axios.get(`${DISASTER_API_URL}/predictions`);
+  const response = await api.get('/predictions');
   return response.data;
 };
 
 export const fetchUserNotifications = async () => {
-  const response = await axios.get(`${DISASTER_API_URL}/user-notifications`);
+  const response = await api.get('/user-notifications');
   return response.data;
 };
 
 export const getIncidentClusters = async () => {
-  const response = await axios.get(`${DISASTER_API_URL}/incident-clusters`);
+  const response = await api.get('/incident-clusters');
   return response.data;
 };
 
 export const getIncidentTimeline = async (incidentId: string) => {
-  const response = await axios.get(`${DISASTER_API_URL}/incidents/${incidentId}/timeline`);
+  const response = await api.get(`/incidents/${incidentId}/timeline`);
   return response.data;
 };
 
 export const getStatistics = async () => {
-  const response = await axios.get(`${DISASTER_API_URL}/statistics`);
+  const response = await api.get('/statistics');
   return response.data;
 };

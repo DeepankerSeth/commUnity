@@ -1,8 +1,7 @@
 import User from '../models/userModel';
 import Notification from '../models/notificationModel';
 import IncidentReport from '../models/incidentReport.js';
-import { io } from '../server';
-import { calculateRiskScore, getRiskLevel, getRecommendedActions } from './riskScoringService';
+import { calculateRiskScore } from './riskScoringService';
 import { emitNotification } from './socketService';
 
 export async function checkSimilarIncidentsAndNotify(newIncident) {
@@ -41,29 +40,39 @@ export async function checkSimilarIncidentsAndNotify(newIncident) {
   }
 }
 
-function generateNotification(incident, userLocation) {
+export function generateNotification(incident, userLocation) {
   const riskScore = calculateRiskScore(incident, userLocation);
-  const riskLevel = getRiskLevel(riskScore);
-  const { generalAction, specificAction } = getRecommendedActions(riskScore, incident.type);
+  let urgency, action;
+
+  if (riskScore >= 80) {
+    urgency = 'URGENT';
+    action = 'Evacuate immediately';
+  } else if (riskScore >= 50) {
+    urgency = 'WARNING';
+    action = 'Prepare for possible evacuation';
+  } else if (riskScore >= 20) {
+    urgency = 'ALERT';
+    action = 'Stay informed and be prepared';
+  } else {
+    urgency = 'ADVISORY';
+    action = 'Be aware of the situation';
+  }
 
   return {
-    urgency: riskLevel,
-    message: `${riskLevel} ALERT: ${incident.type} reported near your location. ${generalAction}`,
+    urgency,
+    message: `${urgency}: ${incident.type} reported near your location. ${action}.`,
     riskScore,
-    incidentId: incident._id,
-    generalAction,
-    specificAction
+    incidentId: incident._id
   };
 }
 
-async function sendNotification(user, notification) {
+export async function sendNotification(user, notification) {
   const newNotification = new Notification({
     userId: user._id,
     ...notification
   });
   await newNotification.save();
   
-  // Emit the notification to the connected client
   emitNotification(user._id.toString(), notification);
   
   // Implement actual notification sending logic here (e.g., push notifications, SMS, email)

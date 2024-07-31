@@ -9,9 +9,7 @@ import app from './app.js';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import { createIncidentReport, getIncidentUpdates, processIncident, getIncidentTimeline } from './src/ai/llmProcessor.js';
 import cors from 'cors';
-import { initializeSocket } from './src/services/socketService';
 import { checkSimilarIncidentsAndNotify } from './src/services/notificationService';
-import { Server } from 'socket.io';
 import http from 'http';
 
 // Initialize Google Cloud Storage
@@ -32,8 +30,8 @@ const speechClient = new speech.SpeechClient();
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const port = process.env.PORT || 0;
 const server = http.createServer(app);
-const io = new Server(server);
-initializeSocket(server);
+
+export { server };
 
 app.use(express.json());
 

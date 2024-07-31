@@ -1,6 +1,7 @@
 import IncidentReport from '../models/incidentReport';
 import User from '../models/userModel';
 import axios from 'axios';
+import { emitVerificationUpdate } from './socketService';
 
 const OFFICIAL_SOURCE_API = process.env.OFFICIAL_SOURCE_API;
 
