@@ -5,8 +5,9 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
 import { uploadFile } from '../services/storageService.js';
-import { analyzeMedia } from '../services/mediaAnalysisService.js';
 import { emitIncidentUpdate } from '../services/socketService.js';
+import { clusteringService } from '../services/clusteringService.js';
+import { verifyIncident } from '../services/verificationService.js';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -83,14 +84,22 @@ Analyze this incident report and provide the following:
 
   const analysis = response.choices[0].message.content;
   
-  // Extract severity and impact radius using regex
   const severityMatch = analysis.match(/Severity: (\d+)/);
   const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
   
+  const severity = severityMatch ? parseInt(severityMatch[1]) : 5;
+  const impactRadius = radiusMatch ? parseFloat(radiusMatch[1]) : 1;
+
+  incident.timeline.push({
+    update: analysis,
+    severity,
+    impactRadius
+  });
+
   return {
     analysis,
-    severity: severityMatch ? parseInt(severityMatch[1]) : 5, // Default to 5 if not found
-    impactRadius: radiusMatch ? parseFloat(radiusMatch[1]) : 1 // Default to 1 mile if not found
+    severity,
+    impactRadius
   };
 }
 
@@ -164,7 +173,8 @@ export async function createIncidentReport(incidentData) {
       type: 'Point',
       coordinates: [parseFloat(longitude), parseFloat(latitude)]
     },
-    mediaUrls
+    mediaUrls,
+    timeline: [{ update: 'Incident created', timestamp: new Date() }]
   });
   await incidentReport.save();
 
@@ -233,4 +243,25 @@ export async function getIncidentUpdates(incidentId) {
   });
 
   return response.choices[0].message.content;
+}
+
+/**
+ * Fetches the incident timeline
+ * @param {string} incidentId - The ID of the incident
+ * @returns {Promise<Object[]>} - The incident timeline
+ */
+export async function getIncidentTimeline(incidentId) {
+  const incident = await IncidentReport.findById(incidentId);
+  if (!incident) {
+    throw new Error('Incident not found');
+  }
+  return incident.timeline;
+}
+
+async function analyzeMedia(url, mediaType) {
+  // Implement media analysis logic here
+  // This could involve calling a computer vision API for images/videos
+  // or a speech-to-text API for audio files
+  // For now, we'll return a placeholder analysis
+  return `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} analysis: Content appears to be related to the incident.`;
 }

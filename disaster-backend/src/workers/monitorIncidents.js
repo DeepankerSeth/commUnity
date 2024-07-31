@@ -6,9 +6,13 @@ import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
 import { getIncidentUpdates, processIncident } from '../ai/llmProcessor.js';
 import { OpenAI } from '@langchain/openai';
-import { calculateDynamicImpactZone } from '../services/incidentAnalysisService';
-import { generateNotification, sendNotification } from '../services/notificationService';
+import { calculateDynamicImpactZone } from '../services/incidentAnalysisService.js';
+import { generateNotification, sendNotification } from '../services/notificationService.js';
 import User from '../models/userModel';
+import { getClusterData } from '../services/clusteringService.js';
+import { emitClusterUpdate } from '../services/socketService.js';
+import { verifyIncident } from '../services/verificationService.js';
+import { checkGeofencesAndNotify } from '../services/geofencingService.js';
 
 dotenv.config();
 
@@ -44,52 +48,71 @@ async function monitorIncidents() {
     });
 
     for (const incident of recentIncidents) {
-      const similarIncidents = await IncidentReport.find({
-        type: incident.type,
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [incident.longitude, incident.latitude]
-            },
-            $maxDistance: 1000 // 1km radius
-          }
-        },
-        _id: { $ne: incident._id }
-      }).sort({ createdAt: -1 }).limit(1);
+      const analysis = await processIncident(incident);
+      incident.analysis = analysis.analysis;
+      incident.severity = analysis.severity;
+      incident.impactRadius = analysis.impactRadius;
 
-      if (similarIncidents.length > 0) {
-        const analysis = await processIncident(incident);
-        incident.analysis = analysis.analysis;
-        incident.severity = analysis.severity;
-        incident.impactRadius = analysis.impactRadius;
-        await incident.save();
+      // Update incident timeline
+      incident.timeline.push({
+        update: 'Incident reprocessed',
+        severity: incident.severity,
+        impactRadius: incident.impactRadius,
+        timestamp: new Date()
+      });
 
-        const nearbyUsers = await User.find({
-          location: {
-            $near: {
-              $geometry: {
-                type: "Point",
-                coordinates: [incident.longitude, incident.latitude]
-              },
-              $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
-            }
-          }
-        });
+      await incident.save();
 
-        for (const user of nearbyUsers) {
-          const notification = generateNotification(incident, user.location);
-          await sendNotification(user, notification);
-        }
+      // Notify nearby users
+      await notifyNearbyUsers(incident);
 
-        // Emit updated incident data to all connected clients
-        emitIncidentUpdate(incident._id, incident);
-      }
+      // Check geofences and notify users
+      await checkGeofencesAndNotify(incident);
+
+      // Verify incident
+      const verificationResult = await verifyIncident(incident._id);
+      incident.verificationScore = verificationResult.verificationScore;
+      incident.verificationStatus = verificationResult.verificationStatus;
+      await incident.save();
+
+      // Emit updated incident data to all connected clients
+      emitIncidentUpdate(incident._id, incident);
+    }
+
+    // Perform clustering
+    const clusterData = await getClusterData();
+    emitClusterUpdate(clusterData);
+
+    // Generate and cache statistics
+    try {
+      await generateStatistics();
+    } catch (error) {
+      console.error('Error generating statistics:', error);
     }
   } catch (error) {
-    console.error('Error in incident monitoring:', error);
+    console.error('Error in monitorIncidents:', error);
   } finally {
     isMonitoring = false;
+    setTimeout(monitorIncidents, 60000); // Run every minute
+  }
+}
+
+async function notifyNearbyUsers(incident) {
+  const nearbyUsers = await User.find({
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [incident.longitude, incident.latitude]
+        },
+        $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
+      }
+    }
+  });
+
+  for (const user of nearbyUsers) {
+    const notification = generateNotification(incident, user.location);
+    await sendNotification(user, notification);
   }
 }
 

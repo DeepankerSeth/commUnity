@@ -48,3 +48,18 @@ export const fetchUserNotifications = async () => {
   const response = await axios.get(`${DISASTER_API_URL}/user-notifications`);
   return response.data;
 };
+
+export const getIncidentClusters = async () => {
+  const response = await axios.get(`${DISASTER_API_URL}/incident-clusters`);
+  return response.data;
+};
+
+export const getIncidentTimeline = async (incidentId: string) => {
+  const response = await axios.get(`${DISASTER_API_URL}/incidents/${incidentId}/timeline`);
+  return response.data;
+};
+
+export const getStatistics = async () => {
+  const response = await axios.get(`${DISASTER_API_URL}/statistics`);
+  return response.data;
+};

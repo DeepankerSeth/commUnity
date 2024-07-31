@@ -1,5 +1,6 @@
 // src/services/riskScoringService.js
 import { getDistance } from 'geolib';
+import { getFeedbackStats } from './feedbackService';
 
 const SEVERITY_WEIGHT = 0.5;
 const DISTANCE_WEIGHT = 0.3;
@@ -70,4 +71,44 @@ export function getRecommendedActions(riskScore, incidentType) {
     generalAction: generalActions[riskLevel],
     specificAction: specificActions[incidentType]?.[riskLevel] || generalActions[riskLevel]
   };
+}
+
+export async function updateRiskScoring(incidentId, accuracy) {
+  const incident = await IncidentReport.findById(incidentId);
+  if (!incident) throw new Error('Incident not found');
+
+  const feedbackStats = await getFeedbackStats(incidentId);
+  
+  // Adjust severity based on feedback
+  const severityAdjustment = (feedbackStats.averageAccuracy - 3) * 0.5; // Range: -1 to +1
+  incident.severity = Math.max(1, Math.min(10, incident.severity + severityAdjustment));
+
+  // Adjust impact radius based on feedback
+  const radiusAdjustment = (feedbackStats.averageAccuracy - 3) * 0.2; // Range: -0.4 to +0.4 miles
+  incident.impactRadius = Math.max(0.1, incident.impactRadius + radiusAdjustment);
+
+  // Adjust verification score based on feedback
+  const verificationAdjustment = (feedbackStats.averageAccuracy - 3) * 0.1; // Range: -0.2 to +0.2
+  incident.verificationScore = Math.max(0, Math.min(1, incident.verificationScore + verificationAdjustment));
+
+  await incident.save();
+
+  // Recalculate risk scores for nearby users
+  const nearbyUsers = await User.find({
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [incident.longitude, incident.latitude]
+        },
+        $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
+      }
+    }
+  });
+
+  for (const user of nearbyUsers) {
+    const riskScore = calculateRiskScore(incident, user.location);
+    // Emit updated risk score to the user
+    emitRiskUpdate(user._id, { incidentId: incident._id, riskScore });
+  }
 }

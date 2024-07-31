@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getIncidentUpdates } from '@/lib/donationAPI';
+import { getIncidentUpdates } from '@/lib/disasterAPI';
 
 interface IncidentUpdatesProps {
   incidentId: string;

@@ -11,6 +11,23 @@ var _bcryptjs = _interopRequireDefault(require("bcryptjs"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
+var geofenceSchema = new _mongoose["default"].Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  coordinates: {
+    type: {
+      type: String,
+      "enum": ['Polygon'],
+      required: true
+    },
+    coordinates: {
+      type: [[[Number]]],
+      required: true
+    }
+  }
+});
 var userSchema = new _mongoose["default"].Schema({
   name: {
     type: String,
@@ -57,10 +74,14 @@ var userSchema = new _mongoose["default"].Schema({
   },
   lockoutTime: {
     type: Date
-  }
+  },
+  geofences: [geofenceSchema]
 });
 userSchema.index({
   location: '2dsphere'
+});
+userSchema.index({
+  'geofences.coordinates': '2dsphere'
 });
 userSchema.pre('save', function _callee(next) {
   return regeneratorRuntime.async(function _callee$(_context) {

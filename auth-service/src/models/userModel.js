@@ -1,6 +1,14 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+const geofenceSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  coordinates: {
+    type: { type: String, enum: ['Polygon'], required: true },
+    coordinates: { type: [[[Number]]], required: true }
+  }
+});
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -40,10 +48,12 @@ const userSchema = new mongoose.Schema({
     }
   }],
   failedLoginAttempts: { type: Number, default: 0 },
-  lockoutTime: { type: Date }
+  lockoutTime: { type: Date },
+  geofences: [geofenceSchema]
 });
 
 userSchema.index({ location: '2dsphere' });
+userSchema.index({ 'geofences.coordinates': '2dsphere' });
 
 userSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
