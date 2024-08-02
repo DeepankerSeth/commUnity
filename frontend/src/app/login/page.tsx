@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { initiateGoogleLogin, initiateFacebookLogin, initiateAppleLogin } from '@/services/authService';
+import { signIn } from 'next-auth/react';
 import { FaGoogle, FaFacebook, FaApple } from 'react-icons/fa';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,13 +71,13 @@ const Login = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">Or continue with</p>
             <div className="mt-4 flex justify-center space-x-6">
-              <Button onClick={initiateGoogleLogin} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
+              <Button onClick={() => signIn('google')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
                 <FaGoogle className="text-gray-600 text-xl" />
               </Button>
-              <Button onClick={initiateFacebookLogin} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
+              <Button onClick={() => signIn('facebook')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
                 <FaFacebook className="text-gray-600 text-xl" />
               </Button>
-              <Button onClick={initiateAppleLogin} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
+              <Button onClick={() => signIn('apple')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
                 <FaApple className="text-gray-600 text-xl" />
               </Button>
             </div>

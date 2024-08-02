@@ -1,4 +1,5 @@
 import axios from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 
 const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3002';
 
@@ -6,8 +7,9 @@ const api = axios.create({
   baseURL: DISASTER_API_URL,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+api.interceptors.request.use(async (config) => {
+  const { getToken } = useAuth();
+  const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

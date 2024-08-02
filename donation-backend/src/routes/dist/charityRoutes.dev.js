@@ -9,6 +9,8 @@ var charityController = require('../controllers/charityController');
 
 var validate = require('../middleware/validate');
 
+var authenticateUser = require('../middleware/auth');
+
 var router = express.Router();
 router.get('/search/:searchTerm', [check('searchTerm').not().isEmpty().withMessage('Search term is required'), check('take').optional().isInt({
   min: 1,

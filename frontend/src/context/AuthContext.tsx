@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getCurrentUser, login, logout, register, refreshToken } from '@/services/authService';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -18,6 +18,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   isAuthenticated: boolean;
   token: string | null;
+  getToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +28,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const { data: session, status } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -34,75 +36,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const router = useRouter();
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.error('Error loading user:', error);
-      } finally {
-        setLoading(false);
+    if (status === 'loading') {
+      setLoading(true);
+    } else {
+      setLoading(false);
+      if (session) {
+        setUser(session.user as User);
+        setIsAuthenticated(true);
+        setToken(session.accessToken as string);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        setToken(null);
       }
-    };
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    const refreshTokenPeriodically = setInterval(async () => {
-      if (isAuthenticated) {
-        try {
-          const newToken = await refreshToken();
-          setToken(newToken);
-        } catch (error) {
-          console.error('Token refresh failed:', error);
-          await logoutHandler();
-        }
-      }
-    }, 14 * 60 * 1000); // Refresh every 14 minutes
-
-    return () => clearInterval(refreshTokenPeriodically);
-  }, [isAuthenticated]);
+    }
+  }, [session, status]);
 
   const loginHandler = async (email: string, password: string) => {
-    try {
-      const userData = await login(email, password);
-      setUser(userData.user);
-      setToken(userData.token);
-      setIsAuthenticated(true);
-      router.push('/');
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+    const result = await signIn('credentials', { 
+      email, 
+      password, 
+      redirect: false,
+    });
+    if (result?.error) {
+      throw new Error(result.error);
     }
   };
 
   const logoutHandler = async () => {
-    try {
-      await logout();
-      setUser(null);
-      setToken(null);
-      setIsAuthenticated(false);
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    }
+    await signOut({ redirect: false });
+    router.push('/login');
   };
 
   const registerHandler = async (name: string, email: string, password: string) => {
-    try {
-      const userData = await register(name, email, password);
-      setUser(userData.user);
-      setToken(userData.token);
-      setIsAuthenticated(true);
-      router.push('/');
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
+    // Implement registration logic here
+    // You may need to create a new API route for registration
+  };
+
+  const getToken = async () => {
+    const session = await getSession();
+    return session?.accessToken as string;
   };
 
   return (
@@ -114,7 +87,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout: logoutHandler, 
         register: registerHandler,
         isAuthenticated,
-        token
+        token,
+        getToken
       }}
     >
       {children}

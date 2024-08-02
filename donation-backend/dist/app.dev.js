@@ -1,7 +1,5 @@
 "use strict";
 
-var _authService = require("auth-service");
-
 var express = require('express');
 
 var bodyParser = require('body-parser');
@@ -24,6 +22,9 @@ var swaggerUi = require('swagger-ui-express');
 
 var YAML = require('yamljs');
 
+var _require = require('./src/middleware/auth'),
+    authenticateJWT = _require.authenticateJWT;
+
 require('dotenv').config();
 
 var app = express();
@@ -40,17 +41,15 @@ var limiter = rateLimit({
 
 });
 app.use(limiter);
-app.use(requestId);
+app.use(requestId); // Use JWT authentication middleware
+
+app.use('/api', authenticateJWT);
 app.use('/api/charities', charityRoutes);
 var swaggerDocument = YAML.load('./src/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-var logger = require('./src/utils/logger'); // Use Passport middleware
+var logger = require('./src/utils/logger'); // Error handling middleware
 
-
-app.use(_authService.passport.initialize()); // Use authentication routes
-
-app.use('/auth', _authService.authRoutes); // Error handling middleware
 
 app.use(function (err, req, res, next) {
   logger.error(err.stack);

@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useAuth } from '../context/AuthContext';
+import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 
 interface PrivateRouteProps {
@@ -7,17 +7,16 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { user } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
+    if (status === 'loading') return; // Do nothing while loading
+    if (!session) router.push('/login'); // Redirect if not authenticated
+  }, [session, status, router]);
 
-  if (!user) {
-    return null;
+  if (status === 'loading' || !session) {
+    return null; // Render nothing while loading or not authenticated
   }
 
   return <>{children}</>;

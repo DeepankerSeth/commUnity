@@ -2,6 +2,7 @@ const express = require('express');
 const { check } = require('express-validator');
 const charityController = require('../controllers/charityController');
 const validate = require('../middleware/validate');
+const authenticateUser = require('../middleware/auth');
 
 const router = express.Router();
 

@@ -2,11 +2,16 @@
 
 import Homepage from "./Homepage/page";
 import Providers from "@/components/Providers";
+import Layout from "@/components/Layout";
+import Header from "@/components/Header";
 
 export default function Page() {
   return (
     <Providers>
-      <Homepage />
+      <Layout>
+        <Header />
+        <Homepage />
+      </Layout>
     </Providers>
   );
 }

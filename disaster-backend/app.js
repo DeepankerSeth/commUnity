@@ -4,6 +4,7 @@
 // Improvements:
 // Added CORS for cross-origin requests.
 // Added comments for clarity.
+// Integrated NextAuth.js for authentication.
 
 import express from 'express';
 import helmet from 'helmet';
@@ -21,7 +22,8 @@ import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import userLocationRoutes from './src/routes/userLocation.js';
 import { createServer } from 'http';
 import { initializeSocket } from './src/services/socketService.js';
-import { passport, authRoutes } from 'auth-service'; // Added import for auth-service
+import authRoutes from './src/routes/authRoutes.js';
+import { authenticateJWT } from './src/middleware/auth.js';
 
 const app = express();
 
@@ -52,16 +54,11 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Use routes
-app.use('/api', apiGateway);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/incidents', incidentRoutes);
-app.use('/api/location', userLocationRoutes); // Using the imported userLocationRoutes
-
-// Use Passport middleware
-app.use(passport.initialize()); // Added for auth-service
-
-// Use authentication routes
-app.use('/auth', authRoutes); // Added for auth-service
+app.use('/auth', authRoutes);
+app.use('/api', authenticateJWT, apiGateway);
+app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
+app.use('/api/incidents', authenticateJWT, incidentRoutes);
+app.use('/api/location', authenticateJWT, userLocationRoutes);
 
 // Global error handler
 app.use(errorHandler);

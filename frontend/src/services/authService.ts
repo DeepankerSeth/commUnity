@@ -15,11 +15,11 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 export const login = async (email: string, password: string) => {
   try {
-    const response = await axiosInstance.post('/auth/login', { email, password });
-    if (response.data.token) {
-      localStorage.setItem('user', JSON.stringify(response.data));
+    const response = await signIn('credentials', { email, password, redirect: false });
+    if (response?.error) {
+      throw new Error(response.error);
     }
-    return response.data;
+    return response;
   } catch (error) {
     throw new Error('Login failed');
   }

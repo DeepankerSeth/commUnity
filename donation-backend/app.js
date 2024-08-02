@@ -9,8 +9,8 @@ const rateLimit = require('express-rate-limit');
 const requestId = require('./src/middleware/requestId');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
+const { authenticateJWT } = require('./src/middleware/auth');
 require('dotenv').config();
-import { passport, authRoutes } from 'auth-service';
 
 const app = express();
 const port = process.env.PORT || 0;
@@ -29,18 +29,15 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use(requestId);
 
+// Use JWT authentication middleware
+app.use('/api', authenticateJWT);
+
 app.use('/api/charities', charityRoutes);
 
 const swaggerDocument = YAML.load('./src/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 const logger = require('./src/utils/logger');
-
-// Use Passport middleware
-app.use(passport.initialize());
-
-// Use authentication routes
-app.use('/auth', authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

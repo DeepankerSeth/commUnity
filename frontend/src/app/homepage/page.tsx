@@ -15,15 +15,21 @@ export default function Homepage() {
   const [incidents, setIncidents] = useState([]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchIncidents = async () => {
       try {
         const data = await getIncidents();
-        setIncidents(data);
+        if (isMounted) {
+          setIncidents(data);
+        }
       } catch (error) {
         console.error('Failed to fetch incidents:', error);
       }
     };
     fetchIncidents();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const toggleReportIncident = () => {
