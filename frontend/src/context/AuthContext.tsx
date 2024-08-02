@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signIn, signOut, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (session) {
         setUser(session.user as User);
         setIsAuthenticated(true);
-        setToken(session.accessToken as string);
+        setToken((session.user as any).accessToken || null);
       } else {
         setUser(null);
         setIsAuthenticated(false);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const getToken = async () => {
     const session = await getSession();
-    return session?.accessToken as string;
+    return (session?.user as any)?.accessToken || null;
   };
 
   return (

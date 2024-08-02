@@ -1,4 +1,4 @@
-import axios from '../services/authService';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3002';
