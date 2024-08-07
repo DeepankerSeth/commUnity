@@ -69,15 +69,6 @@ export const initiateGoogleLogin = async () => {
   }
 };
 
-export const initiateFacebookLogin = async () => {
-  try {
-    const response = await axiosInstance.get('/auth/facebook');
-    window.location.href = response.data.authUrl;
-  } catch (error) {
-    throw new Error('Failed to initiate Facebook login');
-  }
-};
-
 export const initiateAppleLogin = async () => {
   try {
     const response = await axiosInstance.get('/auth/apple');

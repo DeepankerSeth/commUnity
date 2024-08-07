@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { signIn } from 'next-auth/react';
-import { FaGoogle, FaFacebook, FaApple } from 'react-icons/fa';
+import { FaGoogle, FaApple } from 'react-icons/fa';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
@@ -73,9 +73,6 @@ const Login = () => {
             <div className="mt-4 flex justify-center space-x-6">
               <Button onClick={() => signIn('google')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
                 <FaGoogle className="text-gray-600 text-xl" />
-              </Button>
-              <Button onClick={() => signIn('facebook')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
-                <FaFacebook className="text-gray-600 text-xl" />
               </Button>
               <Button onClick={() => signIn('apple')} variant="outline" className="flex items-center justify-center w-16 h-16 rounded-full border border-gray-300 hover:border-gray-400 transition duration-150 ease-in-out">
                 <FaApple className="text-gray-600 text-xl" />
