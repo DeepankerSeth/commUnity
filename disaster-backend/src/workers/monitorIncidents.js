@@ -10,9 +10,15 @@ import { calculateDynamicImpactZone } from '../services/incidentAnalysisService.
 import { generateNotification, sendNotification } from '../services/notificationService.js';
 import User from '../models/userModel';
 import { getClusterData } from '../services/clusteringService.js';
-import { emitClusterUpdate } from '../services/socketService.js';
+import { emitIncidentUpdate, emitNewIncident, emitVerificationUpdate } from '../services/socketService.js';
 import { verifyIncident } from '../services/verificationService.js';
 import { checkGeofencesAndNotify } from '../services/geofencingService.js';
+import {
+  createIncidentNode,
+  createKeywordRelationships,
+  createLocationRelationship,
+  getRelatedIncidents
+} from '../services/graphDatabaseService.js';
 
 dotenv.config();
 
@@ -63,6 +69,14 @@ async function monitorIncidents() {
 
       await incident.save();
 
+      // Update Neo4j
+      await createIncidentNode(incident);
+      await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
+      await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
+
+      // Get related incidents from Neo4j
+      const relatedIncidents = await getRelatedIncidents(incident._id.toString());
+
       // Notify nearby users
       await notifyNearbyUsers(incident);
 
@@ -77,6 +91,7 @@ async function monitorIncidents() {
 
       // Emit updated incident data to all connected clients
       emitIncidentUpdate(incident._id, incident);
+      emitVerificationUpdate(incident._id, verificationResult.verificationScore, verificationResult.verificationStatus);
     }
 
     // Perform clustering
@@ -115,6 +130,21 @@ async function notifyNearbyUsers(incident) {
     await sendNotification(user, notification);
   }
 }
+
+async function updateLLMModel() {
+  try {
+    const feedbackData = await getFeedbackForTraining();
+    if (feedbackData.length > 0) {
+      await fineTuneLLM(feedbackData);
+      console.log('LLM model updated with new feedback data');
+    }
+  } catch (error) {
+    console.error('Error updating LLM model:', error);
+  }
+}
+
+// Call updateLLMModel every 24 hours
+setInterval(updateLLMModel, 24 * 60 * 60 * 1000);
 
 // Run the monitoring function every 5 minutes
 setInterval(monitorIncidents, 5 * 60 * 1000);

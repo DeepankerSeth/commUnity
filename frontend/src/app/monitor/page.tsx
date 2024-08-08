@@ -11,15 +11,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getNearbyIncidents } from "@/lib/disasterAPI";
 import DisasterIcon from "@/components/ui/icons";
+import { LocationSearch } from '@/components/LocationSearch';
+import { FacetedSearch } from '@/components/FacetedSearch';
+import { IncidentFilters, IncidentFilters as IncidentFiltersType } from '@/components/IncidentFilters';
+import { initializeSocket, getSocket } from '@/lib/socket';
+import { Dashboard } from '@/components/Dashboard';
+import { ApiKeyManagement } from '@/components/ApiKeyManagement';
 
 interface Incident {
   _id: string;
   type: string;
-  status: string;
+  status: 'active' | 'resolved';
   severity: number;
+  description: string;
   location: {
     coordinates: [number, number];
   };
+  createdAt: string;
+  updatedAt: string;
 }
 
 const getSeverityColor = (severity: number) => {
@@ -31,21 +40,43 @@ const getSeverityColor = (severity: number) => {
 export default function Monitor() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [location, setLocation] = useState<{ latitude?: number; longitude?: number }>({});
+  const [filters, setFilters] = useState<IncidentFiltersType>({
+    type: '',
+    severity: null,
+    status: '',
+    sortBy: 'severity',
+    sortOrder: 'desc',
+  });
 
   const fetchIncidents = async (lat: number, lon: number) => {
     try {
       const data = await getNearbyIncidents(lat, lon);
-      const sortedIncidents = data.sort((a: Incident, b: Incident) => {
-        if (a.status !== b.status) {
-          return a.status === 'active' ? -1 : 1;
-        }
-        return b.severity - a.severity;
-      });
-      setIncidents(sortedIncidents);
+      setIncidents(data);
     } catch (error) {
       console.error('Failed to fetch nearby incidents', error);
     }
   };
+
+  useEffect(() => {
+    const socket = initializeSocket();
+
+    socket.on('incidentUpdate', (updatedIncident: Incident) => {
+      setIncidents(prevIncidents => 
+        prevIncidents.map(incident => 
+          incident._id === updatedIncident._id ? updatedIncident : incident
+        )
+      );
+    });
+
+    socket.on('newIncident', (newIncident: Incident) => {
+      setIncidents(prevIncidents => [...prevIncidents, newIncident]);
+    });
+
+    return () => {
+      socket.off('incidentUpdate');
+      socket.off('newIncident');
+    };
+  }, []);
 
   useEffect(() => {
     if (location.latitude && location.longitude) {
@@ -71,43 +102,68 @@ export default function Monitor() {
     fetchLocation();
   }, []);
 
+  const filteredIncidents = incidents
+    .filter(incident => 
+      (!filters.type || incident.type.toLowerCase().includes(filters.type.toLowerCase())) &&
+      (!filters.severity || incident.severity === filters.severity) &&
+      (!filters.status || incident.status === filters.status)
+    )
+    .sort((a, b) => {
+      const order = filters.sortOrder === 'asc' ? 1 : -1;
+      if (filters.sortBy === 'severity') {
+        return (a.severity - b.severity) * order;
+      } else if (filters.sortBy === 'createdAt') {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * order;
+      } else {
+        return (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()) * order;
+      }
+    });
+
   return (
-    <div className="flex flex-col w-full min-h-screen bg-background">
-      <header className="flex items-center justify-between h-16 px-6 border-b">
-        <div className="flex items-center gap-2 text-lg font-semibold">
-          <DisasterIcon type="circle alert" className="w-6 h-6" />
-          <span>Monitor</span>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Incident Monitor</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <LocationSearch onLocationSelect={(lat, lon) => setLocation({ latitude: lat, longitude: lon })} />
+          <FacetedSearch />
+          <IncidentFilters onFilterChange={setFilters} />
         </div>
-        <div className="relative flex-1 max-w-md">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input type="search" placeholder="Search by location..." className="w-full pl-10 rounded-md bg-muted" />
-        </div>
-      </header>
-      <main className="flex-1 p-6 grid gap-6">
-        {incidents.map((incident, index) => (
-          <Link href={`/incident/${incident._id}`} key={index}>
-            <Card className={`${getSeverityColor(incident.severity)}`}>
-              <CardHeader className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <DisasterIcon type={incident.type} className="w-6 h-6" />
-                  <CardTitle>{incident.type}</CardTitle>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {incident.status}
+        <ApiKeyManagement />
+      </div>
+      <Dashboard />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+        {filteredIncidents.map((incident) => (
+          <Card key={incident._id}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center">
+                  <DisasterIcon type={incident.type} className="w-6 h-6 mr-2" />
+                  {incident.type}
+                </span>
+                <Badge className={getSeverityColor(incident.severity)}>
+                  Severity: {incident.severity}
                 </Badge>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                <div>
-                  <span className="font-medium">Location:</span> {incident.location.coordinates.join(', ')}
-                </div>
-                <div>
-                  <span className="font-medium">Severity:</span> {incident.severity}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-2">{incident.description}</p>
+              <p className="text-sm text-gray-500">
+                Status: {incident.status}
+              </p>
+              <p className="text-sm text-gray-500">
+                Created: {new Date(incident.createdAt).toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-500">
+                Updated: {new Date(incident.updatedAt).toLocaleString()}
+              </p>
+              <Link href={`/incident/${incident._id}`} passHref>
+                <Button className="mt-2">View Details</Button>
+              </Link>
+            </CardContent>
+          </Card>
         ))}
-      </main>
+      </div>
+      <Footer />
     </div>
   );
 }

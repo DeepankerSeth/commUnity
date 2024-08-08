@@ -24,6 +24,7 @@ import { createServer } from 'http';
 import { initializeSocket } from './src/services/socketService.js';
 import authRoutes from './src/routes/authRoutes.js';
 import { authenticateJWT } from './src/middleware/auth.js';
+import searchRoutes from './src/routes/search.js'; // Added import for search routes
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use('/api', authenticateJWT, apiGateway);
 app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
 app.use('/api/incidents', authenticateJWT, incidentRoutes);
 app.use('/api/location', authenticateJWT, userLocationRoutes);
+app.use('/api', searchRoutes); // Added route for search
 
 // Global error handler
 app.use(errorHandler);

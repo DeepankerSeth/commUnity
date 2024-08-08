@@ -11,6 +11,9 @@ import { createIncidentReport, getIncidentUpdates, processIncident, getIncidentT
 import cors from 'cors';
 import { checkSimilarIncidentsAndNotify } from './src/services/notificationService';
 import http from 'http';
+import { initializeSocketIO } from './src/services/socketService.js';
+import { getTrendAnalysis, getPredictions, getVisualizationData } from './src/controllers/incidentController.js';
+import apiIntegrationRoutes from './src/routes/apiIntegration.js';
 
 // Initialize Google Cloud Storage
 const storage = new Storage();
@@ -30,6 +33,7 @@ const speechClient = new speech.SpeechClient();
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const port = process.env.PORT || 0;
 const server = http.createServer(app);
+initializeSocketIO(server);
 
 export { server };
 
@@ -132,4 +136,14 @@ app.post('/api/incidents/voice', upload.single('audio'), async (req, res) => {
 // Start the incident monitoring worker
 monitorIncidents().catch(error => console.error('Error in monitorIncidents:', error));
 
+app.get('/api/analysis/trends', getTrendAnalysis);
+app.get('/api/analysis/predictions', getPredictions);
+app.get('/api/visualization/data', getVisualizationData);
+
+app.use('/api/v1', apiIntegrationRoutes);
+
 export default app;
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

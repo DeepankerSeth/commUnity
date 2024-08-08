@@ -3,9 +3,11 @@ import { io, Socket } from 'socket.io-client';
 
 interface SocketContextType {
   socket: Socket | null;
+  on: (event: string, listener: (...args: any[]) => void) => void;
+  off: (event: string, listener: (...args: any[]) => void) => void;
 }
 
-const SocketContext = createContext<SocketContextType>({ socket: null });
+const SocketContext = createContext<SocketContextType>({ socket: null, on: () => {}, off: () => {} });
 
 export const useSocket = () => useContext(SocketContext);
 
@@ -28,7 +30,11 @@ export const SocketProvider: React.FC<{ token: string | null; children: React.Re
   }, [token]);
 
   return (
-    <SocketContext.Provider value={{ socket }}>
+    <SocketContext.Provider value={{
+      socket,
+      on: (event, listener) => socket?.on(event, listener),
+      off: (event, listener) => socket?.off(event, listener)
+    }}>
       {children}
     </SocketContext.Provider>
   );

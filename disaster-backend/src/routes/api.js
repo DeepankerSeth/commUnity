@@ -6,7 +6,11 @@ import { getClusterData } from '../services/clusteringService.js';
 import { generateStatistics } from '../services/statisticsService.js';
 import { addGeofence, removeGeofence, updateGeofence } from '../services/geofencingService.js';
 import { updateIncidentBasedOnFeedback } from '../services/incidentService.js';
-import { createIncident } from '../controllers/incidentController';
+import { createIncident, provideFeedback } from '../controllers/incidentController.js';
+import { searchLocations, getLocationDetails } from '../services/locationService.js';
+import { performHybridSearch } from '../services/searchService.js';
+import { getIncidentCluster, getIncidentsInArea, getFullIncidentTimeline, getIncidentPropagation } from '../services/advancedQueryService.js';
+import { processFeedback } from '../services/feedbackService.js';
 
 const router = express.Router();
 
@@ -18,7 +22,8 @@ router.get('/incidents/:id/updates', authenticateUser, async (req, res) => {
     const updates = await getIncidentUpdates(incidentId);
     res.json(updates);
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching incident updates' });
+    console.error('Error fetching incident updates:', error);
+    res.status(500).json({ error: 'An error occurred while fetching incident updates' });
   }
 });
 
@@ -99,10 +104,88 @@ router.put('/geofences/:id', authenticateUser, async (req, res) => {
 router.post('/incidents/:id/feedback', authenticateUser, async (req, res) => {
   try {
     const { accuracy, usefulness } = req.body;
-    await updateIncidentBasedOnFeedback(req.params.id, accuracy, usefulness);
-    res.status(200).json({ message: 'Feedback submitted successfully' });
+    const feedback = await processFeedback({
+      incidentId: req.params.id,
+      userId: req.user.id,
+      accuracy,
+      usefulness
+    });
+    res.json({ message: 'Feedback processed successfully', feedback });
   } catch (error) {
-    res.status(500).json({ error: 'Error submitting feedback' });
+    res.status(500).json({ error: 'Error processing feedback' });
+  }
+});
+
+router.get('/locations/search', authenticateUser, async (req, res) => {
+  try {
+    const { query } = req.query;
+    const userId = req.user.id;
+    const suggestions = await searchLocations(query, userId);
+    res.json(suggestions);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching location suggestions' });
+  }
+});
+
+router.get('/locations/details', authenticateUser, async (req, res) => {
+  try {
+    const { placeId } = req.query;
+    const details = await getLocationDetails(placeId);
+    res.json(details);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching location details' });
+  }
+});
+
+// Hybrid search route
+router.get('/incidents/search', authenticateUser, async (req, res) => {
+  try {
+    const { query, limit = 10 } = req.query;
+    const results = await performHybridSearch(query, parseInt(limit));
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: 'Error performing hybrid search' });
+  }
+});
+
+// Incident cluster route
+router.get('/incidents/:id/cluster', authenticateUser, async (req, res) => {
+  try {
+    const cluster = await getIncidentCluster(req.params.id);
+    res.json(cluster);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching incident cluster' });
+  }
+});
+
+// Incidents in area route
+router.get('/incidents/area', authenticateUser, async (req, res) => {
+  try {
+    const { latitude, longitude, radius } = req.query;
+    const incidents = await getIncidentsInArea(parseFloat(latitude), parseFloat(longitude), parseFloat(radius));
+    res.json(incidents);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching incidents in area' });
+  }
+});
+
+// Full incident timeline route
+router.get('/incidents/:id/timeline', authenticateUser, async (req, res) => {
+  try {
+    const timeline = await getFullIncidentTimeline(req.params.id);
+    res.json(timeline);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching incident timeline' });
+  }
+});
+
+// Incident propagation route
+router.get('/incidents/:id/propagation', authenticateUser, async (req, res) => {
+  try {
+    const propagation = await getIncidentPropagation(req.params.id);
+    res.json(propagation);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching incident propagation' });
   }
 });
 

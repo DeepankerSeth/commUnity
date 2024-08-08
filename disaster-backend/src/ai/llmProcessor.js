@@ -8,6 +8,14 @@ import { uploadFile } from '../services/storageService.js';
 import { emitIncidentUpdate } from '../services/socketService.js';
 import { clusteringService } from '../services/clusteringService.js';
 import { verifyIncident } from '../services/verificationService.js';
+import {
+  createIncidentNode,
+  createKeywordRelationships,
+  createLocationRelationship,
+  getRelatedIncidents
+} from '../services/graphDatabaseService.js';
+import { performHybridSearch } from '../services/searchService.js';
+import path from 'path';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -71,6 +79,17 @@ Analyze this incident report and provide the following:
 3. Estimate the potential impact radius in miles.
 4. List any immediate risks or dangers associated with this incident.
 5. Suggest any immediate actions that should be taken by authorities or the public.
+6. Generate a concise incident name.
+7. Identify the place or neighborhood of impact.
+8. Provide 5-10 relevant keywords or tags for this incident.
+
+Format your response as follows:
+Analysis: [Your detailed analysis]
+Severity: [1-10]
+Impact Radius: [number] miles
+Incident Name: [Concise name]
+Place of Impact: [Place or neighborhood]
+Keywords: [comma-separated list of keywords]
 `;
 
   const response = await openai.chat.completions.create({
@@ -86,9 +105,18 @@ Analyze this incident report and provide the following:
   
   const severityMatch = analysis.match(/Severity: (\d+)/);
   const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
+  const nameMatch = analysis.match(/Incident Name: (.+)/);
+  const placeMatch = analysis.match(/Place of Impact: (.+)/);
+  const keywordsMatch = analysis.match(/Keywords: (.+)/);
   
+  const metadata = {
+    incidentName: nameMatch ? nameMatch[1].trim() : '',
+    placeOfImpact: placeMatch ? placeMatch[1].trim() : '',
+    keywords: keywordsMatch ? keywordsMatch[1].split(',').map(k => k.trim()) : []
+  };
+
   const severity = severityMatch ? parseInt(severityMatch[1]) : 5;
-  const impactRadius = radiusMatch ? parseFloat(radiusMatch[1]) : 1;
+  const impactRadius = radiusMatch ? parseFloat(radiusMatch[1]) : 2;
 
   incident.timeline.push({
     update: analysis,
@@ -99,7 +127,8 @@ Analyze this incident report and provide the following:
   return {
     analysis,
     severity,
-    impactRadius
+    impactRadius,
+    metadata
   };
 }
 
@@ -127,13 +156,25 @@ export async function updateIncident(incidentId, newReport) {
   existingIncident.analysis = analysis.analysis;
   existingIncident.severity = analysis.severity;
   existingIncident.impactRadius = analysis.impactRadius;
+  existingIncident.metadata = analysis.metadata;
   await existingIncident.save();
 
-  // Trigger re-evaluation of notifications
-  monitorIncidents();
+  // Update Neo4j
+  await createIncidentNode(existingIncident);
+  await createKeywordRelationships(existingIncident._id.toString(), existingIncident.metadata.keywords);
+  await createLocationRelationship(existingIncident._id.toString(), existingIncident.metadata.placeOfImpact);
+
+  // Get related incidents from Neo4j
+  const relatedIncidents = await getRelatedIncidents(existingIncident._id.toString());
 
   // Emit incident update to connected clients
-  emitIncidentUpdate(incidentId, existingIncident);
+  emitIncidentUpdate(incidentId, {
+    description: existingIncident.description,
+    analysis: existingIncident.analysis,
+    severity: existingIncident.severity,
+    impactRadius: existingIncident.impactRadius,
+    metadata: existingIncident.metadata
+  });
 
   return existingIncident;
 }
@@ -178,6 +219,14 @@ export async function createIncidentReport(incidentData) {
   });
   await incidentReport.save();
 
+  // Process the incident with LLM
+  const analysis = await processIncident(incidentReport);
+  incidentReport.analysis = analysis.analysis;
+  incidentReport.severity = analysis.severity;
+  incidentReport.impactRadius = analysis.impactRadius;
+  incidentReport.metadata = analysis.metadata;
+  await incidentReport.save();
+
   // Create vector embedding
   const embedding = await generateEmbedding(`${type} ${combinedDescription}`);
 
@@ -201,6 +250,11 @@ export async function createIncidentReport(incidentData) {
   incidentReport.vectorId = vectorId;
   await incidentReport.save();
 
+  // Store in Neo4j
+  await createIncidentNode(incidentReport);
+  await createKeywordRelationships(incidentReport._id.toString(), incidentReport.metadata.keywords);
+  await createLocationRelationship(incidentReport._id.toString(), incidentReport.metadata.placeOfImpact);
+
   return incidentReport;
 }
 
@@ -216,16 +270,19 @@ export async function getIncidentUpdates(incidentId) {
     throw new Error('Incident not found');
   }
 
-  // Query similar incidents
-  const similarIncidents = await vectorStore.similaritySearch(
+  // Perform hybrid search
+  const similarIncidents = await performHybridSearch(
     `${incident.type} ${incident.description}`,
     5,
     { reportId: { $ne: incidentId } }
   );
 
+  // Get related incidents from Neo4j
+  const relatedIncidents = await getRelatedIncidents(incidentId);
+
   // Process with LLM
   const prompt = `
-    Analyze the following incident and similar incidents to provide a comprehensive update:
+    Analyze the following incident, similar incidents, and related incidents to provide a comprehensive update:
 
     Main Incident:
     Type: ${incident.type}
@@ -233,6 +290,9 @@ export async function getIncidentUpdates(incidentId) {
 
     Similar Incidents:
     ${similarIncidents.map(inc => `- ${inc.pageContent}`).join('\n')}
+
+    Related Incidents:
+    ${relatedIncidents.map(inc => `- ${inc.incident.type}: ${inc.incident.description}`).join('\n')}
 
     Provide a detailed update on the situation, including any patterns, potential risks, and recommended actions.
   `;
@@ -256,6 +316,62 @@ export async function getIncidentTimeline(incidentId) {
     throw new Error('Incident not found');
   }
   return incident.timeline;
+}
+
+export async function updateMetadataWithFeedback(incidentId, userFeedback) {
+  const incident = await IncidentReport.findById(incidentId);
+
+  if (!incident) {
+    throw new Error('Incident not found');
+  }
+
+  const prompt = `
+    Original Incident:
+    Type: ${incident.type}
+    Description: ${incident.description}
+    Current Metadata: ${JSON.stringify(incident.metadata)}
+
+    User Feedback: ${userFeedback}
+
+    Based on the user feedback, please update the incident metadata. Provide the updated metadata in the following format:
+    Incident Name: [Updated name]
+    Place of Impact: [Updated place]
+    Keywords: [Updated comma-separated list of keywords]
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
+  });
+
+  const updatedMetadata = parseMetadataFromResponse(response.choices[0].message.content);
+
+  incident.metadata = { ...incident.metadata, ...updatedMetadata };
+  await incident.save();
+
+  // Update Neo4j
+  await createIncidentNode(incident);
+  await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
+  await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
+
+  // Log the feedback and updated metadata for future model fine-tuning
+  console.log('User feedback:', userFeedback);
+  console.log('Updated metadata:', updatedMetadata);
+  // TODO: Implement a mechanism to collect this data for periodic model fine-tuning
+
+  return incident;
+}
+
+function parseMetadataFromResponse(response) {
+  const nameMatch = response.match(/Incident Name: (.+)/);
+  const placeMatch = response.match(/Place of Impact: (.+)/);
+  const keywordsMatch = response.match(/Keywords: (.+)/);
+
+  return {
+    incidentName: nameMatch ? nameMatch[1].trim() : '',
+    placeOfImpact: placeMatch ? placeMatch[1].trim() : '',
+    keywords: keywordsMatch ? keywordsMatch[1].split(',').map(k => k.trim()) : []
+  };
 }
 
 async function analyzeMedia(url, mediaType) {

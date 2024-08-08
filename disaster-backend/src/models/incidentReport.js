@@ -10,6 +10,12 @@ const incidentReportSchema = new mongoose.Schema({
   severity: { type: Number, default: 0 },
   impactRadius: { type: Number, default: 0 },
   analysis: { type: String },
+  metadata: {
+    incidentName: { type: String },
+    placeOfImpact: { type: String },
+    neighborhood: { type: String },
+    keywords: [{ type: String }]
+  },
   timeline: [{
     update: { type: String, required: true },
     severity: { type: Number },
@@ -21,6 +27,7 @@ const incidentReportSchema = new mongoose.Schema({
 });
 
 incidentReportSchema.index({ location: '2dsphere' });
+incidentReportSchema.index({ 'metadata.keywords': 1 });
 
 const IncidentReport = mongoose.model('IncidentReport', incidentReportSchema);
 
