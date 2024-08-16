@@ -2,7 +2,7 @@ import {
   getRelatedIncidents,
   getIncidentsByLocation,
   getIncidentTimeline
-} from './graphDatabaseService';
+} from './graphDatabaseService.js';
 
 export async function getIncidentCluster(incidentId) {
   const relatedIncidents = await getRelatedIncidents(incidentId);

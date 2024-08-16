@@ -6,8 +6,8 @@ import { FuzzySearch } from 'fuzzy-search';
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY,
-  environment: process.env.PINECONE_ENVIRONMENT,
-});
+ // environment: process.env.PINECONE_ENVIRONMENT
+}); 
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
 const vectorStore = await PineconeStore.fromExistingIndex(

@@ -1,6 +1,7 @@
 import IncidentReport from '../models/incidentReport.js';
 import { processIncident } from '../ai/llmProcessor.js';
 import { emitNewIncident, emitIncidentUpdate } from '../services/socketService.js';
+import { uploadFile } from '../services/storageService.js';
 
 export const getIncidents = async (req, res) => {
   try {
@@ -24,7 +25,11 @@ export const getIncidents = async (req, res) => {
 
 export const createIncident = async (req, res) => {
   try {
-    const { type, description, latitude, longitude, severity } = req.body;
+    const { type, description, latitude, longitude } = req.body;
+    const files = req.files;
+
+    const mediaUrls = await Promise.all(files.map(file => uploadFile(file)));
+
     const newIncident = new IncidentReport({
       type,
       description,
@@ -32,12 +37,15 @@ export const createIncident = async (req, res) => {
         type: 'Point',
         coordinates: [longitude, latitude]
       },
-      severity,
+      mediaUrls,
       status: 'active'
     });
 
     const analysis = await processIncident(newIncident);
+    newIncident.type = analysis.type;
+    newIncident.title = analysis.title;
     newIncident.analysis = analysis.analysis;
+    newIncident.severity = analysis.severity;
     newIncident.impactRadius = analysis.impactRadius;
 
     await newIncident.save();
@@ -46,7 +54,7 @@ export const createIncident = async (req, res) => {
     res.status(201).json(newIncident);
   } catch (error) {
     console.error('Error creating incident:', error);
-    res.status(500).json({ error: 'An error occurred while creating the incident' });
+    res.status(500).json({ error: 'An error occurred while creating the incident', details: error.message });
   }
 };
 

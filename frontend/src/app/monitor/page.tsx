@@ -1,7 +1,7 @@
 'use client';
 
 // pages/monitor
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,12 @@ import { getNearbyIncidents } from "@/lib/disasterAPI";
 import DisasterIcon from "@/components/ui/icons";
 import { LocationSearch } from '@/components/LocationSearch';
 import { FacetedSearch } from '@/components/FacetedSearch';
+import { performHybridSearch } from '@/lib/disasterAPI';
 import { IncidentFilters, IncidentFilters as IncidentFiltersType } from '@/components/IncidentFilters';
 import { initializeSocket, getSocket } from '@/lib/socket';
 import { Dashboard } from '@/components/Dashboard';
 import { ApiKeyManagement } from '@/components/ApiKeyManagement';
+import { useDebounce } from 'use-debounce';
 
 interface Incident {
   _id: string;
@@ -47,29 +49,60 @@ export default function Monitor() {
     sortBy: 'severity',
     sortOrder: 'desc',
   });
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const INCIDENTS_PER_PAGE = 10;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([]);
 
-  const fetchIncidents = async (lat: number, lon: number) => {
-    try {
-      const data = await getNearbyIncidents(lat, lon);
-      setIncidents(data);
-    } catch (error) {
-      console.error('Failed to fetch nearby incidents', error);
+  useEffect(() => {
+    if (debouncedSearchTerm) {
+      performSearch(debouncedSearchTerm);
+    } else {
+      setFilteredIncidents(incidents);
     }
+  }, [debouncedSearchTerm, incidents]);
+
+  const performSearch = useCallback(async (term: string) => {
+    try {
+      const results = await performHybridSearch(term);
+      setFilteredIncidents(results);
+    } catch (error) {
+      console.error('Error performing search:', error);
+      // Optionally set an error state here
+    }
+  }, []);
+
+  const loadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
+
+  const fetchIncidents = async (latitude: number, longitude: number) => {
+    const newIncidents = await getNearbyIncidents(latitude, longitude, INCIDENTS_PER_PAGE, (page - 1) * INCIDENTS_PER_PAGE);
+    setIncidents(prevIncidents => [...prevIncidents, ...newIncidents]);
+    setHasMore(newIncidents.length === INCIDENTS_PER_PAGE);
+  };
+
+  useEffect(() => {
+    if (location.latitude && location.longitude) {
+      fetchIncidents(location.latitude, location.longitude);
+    }
+  }, [location, page]);
 
   useEffect(() => {
     const socket = initializeSocket();
 
-    socket.on('incidentUpdate', (updatedIncident: Incident) => {
+    socket.on('incidentUpdate', (updatedIncident) => {
       setIncidents(prevIncidents => 
         prevIncidents.map(incident => 
-          incident._id === updatedIncident._id ? updatedIncident : incident
+          incident._id === updatedIncident._id ? { ...incident, ...updatedIncident } : incident
         )
       );
     });
 
-    socket.on('newIncident', (newIncident: Incident) => {
-      setIncidents(prevIncidents => [...prevIncidents, newIncident]);
+    socket.on('newIncident', (newIncident) => {
+      setIncidents(prevIncidents => [newIncident, ...prevIncidents]);
     });
 
     return () => {
@@ -77,12 +110,6 @@ export default function Monitor() {
       socket.off('newIncident');
     };
   }, []);
-
-  useEffect(() => {
-    if (location.latitude && location.longitude) {
-      fetchIncidents(location.latitude, location.longitude);
-    }
-  }, [location]);
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -102,22 +129,24 @@ export default function Monitor() {
     fetchLocation();
   }, []);
 
-  const filteredIncidents = incidents
-    .filter(incident => 
-      (!filters.type || incident.type.toLowerCase().includes(filters.type.toLowerCase())) &&
-      (!filters.severity || incident.severity === filters.severity) &&
-      (!filters.status || incident.status === filters.status)
-    )
-    .sort((a, b) => {
-      const order = filters.sortOrder === 'asc' ? 1 : -1;
-      if (filters.sortBy === 'severity') {
-        return (a.severity - b.severity) * order;
-      } else if (filters.sortBy === 'createdAt') {
-        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * order;
-      } else {
-        return (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()) * order;
-      }
-    });
+  const displayedIncidents = useMemo(() => {
+    return filteredIncidents
+      .filter(incident => 
+        (!filters.type || incident.type.toLowerCase().includes(filters.type.toLowerCase())) &&
+        (!filters.severity || incident.severity === filters.severity) &&
+        (!filters.status || incident.status === filters.status)
+      )
+      .sort((a, b) => {
+        const order = filters.sortOrder === 'asc' ? 1 : -1;
+        if (filters.sortBy === 'severity') {
+          return (a.severity - b.severity) * order;
+        } else if (filters.sortBy === 'createdAt') {
+          return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * order;
+        } else {
+          return (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()) * order;
+        }
+      });
+  }, [filteredIncidents, filters]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -132,7 +161,7 @@ export default function Monitor() {
       </div>
       <Dashboard />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-        {filteredIncidents.map((incident) => (
+        {displayedIncidents.map((incident) => (
           <Card key={incident._id}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -163,6 +192,9 @@ export default function Monitor() {
           </Card>
         ))}
       </div>
+      {hasMore && (
+        <Button onClick={loadMore} className="mt-4">Load More</Button>
+      )}
       <Footer />
     </div>
   );

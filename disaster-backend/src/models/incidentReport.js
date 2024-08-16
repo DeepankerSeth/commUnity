@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const incidentReportSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: { type: String, required: true },
+  title: { type: String, required: true }, // Added title field
   description: { type: String, required: true },
   latitude: { type: Number, required: true },
   longitude: { type: Number, required: true },

@@ -9,7 +9,7 @@ import app from './app.js';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import { createIncidentReport, getIncidentUpdates, processIncident, getIncidentTimeline } from './src/ai/llmProcessor.js';
 import cors from 'cors';
-import { checkSimilarIncidentsAndNotify } from './src/services/notificationService';
+import { checkSimilarIncidentsAndNotify } from './src/services/notificationService.js';
 import http from 'http';
 import { initializeSocketIO } from './src/services/socketService.js';
 import { getTrendAnalysis, getPredictions, getVisualizationData } from './src/controllers/incidentController.js';
@@ -31,7 +31,7 @@ const speechClient = new speech.SpeechClient();
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-const port = process.env.PORT || 0;
+const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 initializeSocketIO(server);
 
@@ -39,20 +39,13 @@ export { server };
 
 app.use(express.json());
 
-// Add CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
 /**
  * API endpoint for reporting incidents
  * Accepts media (will only support photos currently), and file uploads along with a description
  */
 
 // Report an incident
-app.post('/api/incidents', upload.array('media', 5), async (req, res) => {
+app.post('/api/incidents', upload.array('mediaFiles'), async (req, res) => {
   try {
     const { userId, type, description, latitude, longitude } = req.body;
     const mediaFiles = req.files;
@@ -144,6 +137,17 @@ app.use('/api/v1', apiIntegrationRoutes);
 
 export default app;
 
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const startServer = (port) => {
+  server.listen(port, () => {
+    console.log(`Server started on port ${port}`);
+  }).on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.log(`Port ${port} is busy, trying the next one...`);
+      startServer(port + 1);
+    } else {
+      console.error('Server error:', error);
+    }
+  });
+};
+
+startServer(PORT);

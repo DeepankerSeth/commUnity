@@ -1,7 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import geohash from 'ngeohash';
-import Location from '../models/location';
+import Location from '../models/userLocation.js';
 import { getCachedLocation, setCachedLocation } from './locationCacheService.js';
 
 const cache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours

@@ -1,12 +1,10 @@
 import { DBSCAN } from 'density-clustering';
-import IncidentReport from '../models/incidentReport';
-import { emitClusterUpdate } from './socketService';
-import { redisClient } from '../db/redis';
+import IncidentReport from '../models/incidentReport.js';
+import { emitClusterUpdate } from './socketService.js';
 
 const EPSILON = 1000; // 1km in meters
 const MIN_POINTS = 2; // Minimum points to form a cluster
-const CACHE_KEY = 'incident_clusters';
-const CACHE_EXPIRY = 300; // 5 minutes
+const CACHE_EXPIRY = 300000; // 5 minutes in milliseconds
 
 export async function performClustering() {
   const incidents = await IncidentReport.find({
@@ -23,8 +21,16 @@ export async function performClustering() {
     size: cluster.length
   }));
 
-  // Cache cluster data
-  await redisClient.setex(CACHE_KEY, CACHE_EXPIRY, JSON.stringify(clusterData));
+  // Cache cluster data in MongoDB
+  await IncidentReport.findOneAndUpdate(
+    { type: 'clusterCache' },
+    { 
+      type: 'clusterCache',
+      clusterData: clusterData,
+      updatedAt: new Date()
+    },
+    { upsert: true, new: true }
+  );
 
   // Emit cluster update to all connected clients
   emitClusterUpdate(clusterData);
@@ -38,9 +44,9 @@ function calculateClusterCenter(points) {
 }
 
 export async function getClusterData() {
-  const cachedData = await redisClient.get(CACHE_KEY);
-  if (cachedData) {
-    return JSON.parse(cachedData);
+  const cachedCluster = await IncidentReport.findOne({ type: 'clusterCache' });
+  if (cachedCluster && (new Date() - cachedCluster.updatedAt) < CACHE_EXPIRY) {
+    return cachedCluster.clusterData;
   }
   return performClustering();
 }

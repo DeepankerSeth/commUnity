@@ -1,7 +1,7 @@
-import IncidentReport from '../models/incidentReport';
-import User from '../models/userModel';
+import IncidentReport from '../models/incidentReport.js';
 import axios from 'axios';
-import { emitVerificationUpdate } from './socketService';
+import { emitVerificationUpdate } from './socketService.js';
+import { getUsersFromAuth0 } from '../services/auth0Service.js';
 
 const OFFICIAL_SOURCE_API = process.env.OFFICIAL_SOURCE_API;
 
@@ -45,7 +45,7 @@ export async function verifyIncident(incidentId) {
 }
 
 async function getUserVerification(incident) {
-  const nearbyUsers = await User.find({
+  const nearbyUsers = await getUsersFromAuth0({
     location: {
       $near: {
         $geometry: {

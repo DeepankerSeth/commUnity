@@ -5,12 +5,11 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
 import { getIncidentUpdates, processIncident } from '../ai/llmProcessor.js';
-import { OpenAI } from '@langchain/openai';
+import { OpenAI } from 'openai';
 import { calculateDynamicImpactZone } from '../services/incidentAnalysisService.js';
 import { generateNotification, sendNotification } from '../services/notificationService.js';
-import User from '../models/userModel';
 import { getClusterData } from '../services/clusteringService.js';
-import { emitIncidentUpdate, emitNewIncident, emitVerificationUpdate } from '../services/socketService.js';
+import { emitIncidentUpdate, emitNewIncident, emitVerificationUpdate, emitClusterUpdate } from '../services/socketService.js';
 import { verifyIncident } from '../services/verificationService.js';
 import { checkGeofencesAndNotify } from '../services/geofencingService.js';
 import {
@@ -19,6 +18,8 @@ import {
   createLocationRelationship,
   getRelatedIncidents
 } from '../services/graphDatabaseService.js';
+import { getUsersFromAuth0 } from '../services/auth0Service.js';
+import { generateStatistics } from '../services/statisticsService.js';
 
 dotenv.config();
 
@@ -113,12 +114,12 @@ async function monitorIncidents() {
 }
 
 async function notifyNearbyUsers(incident) {
-  const nearbyUsers = await User.find({
+  const nearbyUsers = await getUsersFromAuth0({
     location: {
       $near: {
         $geometry: {
           type: "Point",
-          coordinates: [incident.longitude, incident.latitude]
+          coordinates: [incident.location.coordinates[1], incident.location.coordinates[0]]
         },
         $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
       }

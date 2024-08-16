@@ -1,15 +1,15 @@
-import React from 'react';
-import PrivateRoute from '@/components/PrivateRoute';
+'use client';
 
-const Dashboard: React.FC = () => {
+import WithAuth from '@/components/WithAuth';
+import { useUser } from '@auth0/nextjs-auth0/client';
+
+export default function Dashboard() {
+  const { user } = useUser();
+
   return (
-    <PrivateRoute>
-      <div>
-        <h1>Dashboard</h1>
-        <p>This is a protected page. Only authenticated users can see this content.</p>
-      </div>
-    </PrivateRoute>
+    <WithAuth>
+      <h1>Dashboard</h1>
+      <p>Welcome, {user?.name}!</p>
+    </WithAuth>
   );
-};
-
-export default Dashboard;
+}

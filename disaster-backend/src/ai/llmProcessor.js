@@ -1,12 +1,12 @@
-import { OpenAI } from '@langchain/openai';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { OpenAI } from 'openai';
+import { OpenAIEmbeddings } from "@langchain/openai";
 import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import IncidentReport from '../models/incidentReport.js';
 import { uploadFile } from '../services/storageService.js';
 import { emitIncidentUpdate } from '../services/socketService.js';
-import { clusteringService } from '../services/clusteringService.js';
+import { performClustering, getClusterData } from '../services/clusteringService.js';
 import { verifyIncident } from '../services/verificationService.js';
 import {
   createIncidentNode,
@@ -19,7 +19,7 @@ import path from 'path';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  openAIApiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Initialize OpenAI embeddings
@@ -64,72 +64,48 @@ export async function generateEmbedding(text) {
  * @param {Object} incident - The incident report to process
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
+
 export async function processIncident(incident) {
-  const { description, type, latitude, longitude, mediaUrls } = incident;
+  try {
+    const prompt = `Analyze the following incident:
+Type: ${incident.type || 'Not specified'}
+Description: ${incident.description}
+Media: ${incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'}
 
-  const prompt = `
-Incident Description: ${description}
-Incident Type: ${type}
-Location: Latitude ${latitude}, Longitude ${longitude}
-Media URLs: ${mediaUrls.join(', ')}
+Provide the following information:
+1. If the incident type is not specified, determine the most appropriate type from this list if applicable or assign an appropriate type to the best of your ability: Fire, Flood, Earthquake, Hurricane, Tornado, Landslide, Tsunami, Volcanic Eruption, Wildfire, Blizzard, Drought, Heatwave, Chemical Spill, Nuclear Incident, Terrorist Attack, Civil Unrest, Pandemic, Infrastructure Failure, Transportation Accident, Other.
+2. A concise and descriptive title for the incident (max 10 words).
+3. A detailed analysis of the incident.
+4. Assess the severity of the incident on a scale of 1-5, where 1 is minor and 5 is catastrophic.
+5. Estimate the potential impact radius in miles.
 
-Analyze this incident report and provide the following:
-1. A detailed picture of the incident including any connections or relevant context.
-2. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic.
-3. Estimate the potential impact radius in miles.
-4. List any immediate risks or dangers associated with this incident.
-5. Suggest any immediate actions that should be taken by authorities or the public.
-6. Generate a concise incident name.
-7. Identify the place or neighborhood of impact.
-8. Provide 5-10 relevant keywords or tags for this incident.
+Format your response as a JSON object with the following structure:
+{
+  "type": "string",
+  "title": "string",
+  "analysis": "string",
+  "severity": number,
+  "impactRadius": number
+}`;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+    });
 
-Format your response as follows:
-Analysis: [Your detailed analysis]
-Severity: [1-10]
-Impact Radius: [number] miles
-Incident Name: [Concise name]
-Place of Impact: [Place or neighborhood]
-Keywords: [comma-separated list of keywords]
-`;
+    const result = JSON.parse(response.choices[0].message.content);
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [
-      { role: 'system', content: 'You are a disaster response AI assistant.' },
-      { role: 'user', content: prompt }
-    ],
-    max_tokens: 1000,
-  });
-
-  const analysis = response.choices[0].message.content;
-  
-  const severityMatch = analysis.match(/Severity: (\d+)/);
-  const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
-  const nameMatch = analysis.match(/Incident Name: (.+)/);
-  const placeMatch = analysis.match(/Place of Impact: (.+)/);
-  const keywordsMatch = analysis.match(/Keywords: (.+)/);
-  
-  const metadata = {
-    incidentName: nameMatch ? nameMatch[1].trim() : '',
-    placeOfImpact: placeMatch ? placeMatch[1].trim() : '',
-    keywords: keywordsMatch ? keywordsMatch[1].split(',').map(k => k.trim()) : []
-  };
-
-  const severity = severityMatch ? parseInt(severityMatch[1]) : 5;
-  const impactRadius = radiusMatch ? parseFloat(radiusMatch[1]) : 2;
-
-  incident.timeline.push({
-    update: analysis,
-    severity,
-    impactRadius
-  });
-
-  return {
-    analysis,
-    severity,
-    impactRadius,
-    metadata
-  };
+    return {
+      type: result.type,
+      title: result.title,
+      analysis: result.analysis,
+      severity: result.severity,
+      impactRadius: result.impactRadius
+    };
+  } catch (error) {
+    console.error('Error processing incident:', error);
+    throw error;
+  }
 }
 
 /**

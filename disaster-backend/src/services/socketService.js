@@ -1,5 +1,4 @@
 import { Server } from 'socket.io';
-import jwt from 'jsonwebtoken';
 
 let io;
 
@@ -34,5 +33,17 @@ export function emitNewIncident(incident) {
 export function emitVerificationUpdate(incidentId, verificationScore, verificationStatus) {
   if (io) {
     io.emit('verificationUpdate', { incidentId, verificationScore, verificationStatus });
+  }
+}
+
+export function emitClusterUpdate(clusterData) {
+  if (io) {
+    io.emit('clusterUpdate', clusterData);
+  }
+}
+
+export function emitNotification(userId, notification) {
+  if (io) {
+    io.to(userId).emit('notification', notification);
   }
 }

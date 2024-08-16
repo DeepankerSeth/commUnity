@@ -6,7 +6,7 @@
 // Placeholder for optimization algorithms.
 
 // src/services/evacuationService.js
-import { getEvacuationRoute } from './mappingService';
+import { getEvacuationRoute } from './mappingService.js';
 
 // Function to optimize evacuation routes
 const optimizeEvacuationRoute = async (start, end) => {

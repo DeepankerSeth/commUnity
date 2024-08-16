@@ -1,8 +1,8 @@
-import User from '../models/userModel';
-import Notification from '../models/notificationModel';
+import Notification from '../models/notification.js';
 import IncidentReport from '../models/incidentReport.js';
-import { calculateRiskScore } from './riskScoringService';
-import { emitNotification } from './socketService';
+import { calculateRiskScore } from './riskScoringService.js';
+import { emitNotification } from './socketService.js';
+import { getUsersFromAuth0 } from '../services/auth0Service.js';
 
 export async function checkSimilarIncidentsAndNotify(newIncident) {
   const similarIncidents = await IncidentReport.find({
@@ -21,7 +21,7 @@ export async function checkSimilarIncidentsAndNotify(newIncident) {
   });
 
   if (similarIncidents.length >= 1) {
-    const nearbyUsers = await User.find({
+    const nearbyUsers = await getUsersFromAuth0({
       location: {
         $near: {
           $geometry: {

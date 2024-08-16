@@ -1,6 +1,6 @@
 // src/services/riskScoringService.js
 import { getDistance } from 'geolib';
-import { getFeedbackStats } from './feedbackService';
+import { getFeedbackStats } from './feedbackService.js';
 
 const SEVERITY_WEIGHT = 0.5;
 const DISTANCE_WEIGHT = 0.3;

@@ -4,13 +4,14 @@ import { Storage } from '@google-cloud/storage';
 import { emitIncidentUpdate, emitNewIncident } from '../services/socketService.js';
 import { analyzeTrends, getPredictiveModel } from '../services/trendAnalysisService.js';
 import { getHeatmapData, getTimeSeriesData } from '../services/visualizationService.js';
+import { getUserFromAuth0 } from '../services/auth0Service.js';
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 
-export async function createIncident(req, res) {
+export const createIncident = async (req, res) => {
   try {
-    const { userId, type, description, latitude, longitude } = req.body;
+    const { type, description, latitude, longitude } = req.body;
     const mediaFiles = req.files;
 
     // Upload media files to Google Cloud Storage
@@ -26,7 +27,7 @@ export async function createIncident(req, res) {
     }));
 
     // Create incident report
-    const incidentData = { userId, type, description, latitude, longitude, mediaUrls };
+    const incidentData = { type, description, latitude, longitude, mediaUrls };
     const incidentReport = await createIncidentReport(incidentData);
 
     // Process the incident
@@ -45,17 +46,10 @@ export async function createIncident(req, res) {
     // Check for similar incidents and send notifications if necessary
     await checkSimilarIncidentsAndNotify(incidentReport);
 
-    res.status(201).json({ 
-      message: 'Incident reported and analyzed successfully', 
-      incidentId: incidentReport._id,
-      analysis: analysis.analysis,
-      severity: analysis.severity,
-      impactRadius: analysis.impactRadius,
-      metadata: analysis.metadata
-    });
+    res.status(201).json(incidentReport);
   } catch (error) {
     console.error('Error creating incident:', error);
-    res.status(500).json({ error: 'An error occurred while creating the incident report' });
+    res.status(500).json({ error: 'An error occurred while creating the incident' });
   }
 }
 

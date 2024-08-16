@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import { getSession } from '@auth0/nextjs-auth0';
 
 const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3002';
 
@@ -8,16 +8,17 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const { getToken } = useAuth();
-  const token = await getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const session = await getSession();
+  if (session?.accessToken) {
+    config.headers.Authorization = `Bearer ${session.accessToken}`;
   }
   return config;
 });
 
 export const reportIncident = async (formData: FormData) => {
-  const response = await api.post('/incidents/report', formData);
+  const response = await api.post('/api/incidents', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
   return response.data;
 };
 
@@ -51,9 +52,9 @@ export const updateUserLocation = async (locationData: any) => {
   return response.data;
 };
 
-export const getNearbyIncidents = async (latitude: number, longitude: number, maxDistance: number = 5000) => {
+export const getNearbyIncidents = async (latitude: number, longitude: number, maxDistance: number = 5000, offset: number = 0) => {
   const response = await api.get('/incidents/nearby', {
-    params: { latitude, longitude, maxDistance }
+    params: { latitude, longitude, maxDistance, offset }
   });
   return response.data;
 };

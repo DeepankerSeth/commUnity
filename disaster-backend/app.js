@@ -1,11 +1,6 @@
 // Purpose: Implement security best practices.
 // Load environment variables and connect to the database:
 
-// Improvements:
-// Added CORS for cross-origin requests.
-// Added comments for clarity.
-// Integrated NextAuth.js for authentication.
-
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -21,10 +16,9 @@ import dotenv from 'dotenv';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import userLocationRoutes from './src/routes/userLocation.js';
 import { createServer } from 'http';
-import { initializeSocket } from './src/services/socketService.js';
-import authRoutes from './src/routes/authRoutes.js';
-import { authenticateJWT } from './src/middleware/auth.js';
+import { initializeSocketIO } from './src/services/socketService.js';
 import searchRoutes from './src/routes/search.js'; // Added import for search routes
+import { checkJwt } from './src/middleware/auth0Middleware.js';
 
 const app = express();
 
@@ -55,11 +49,10 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Use routes
-app.use('/auth', authRoutes);
-app.use('/api', authenticateJWT, apiGateway);
-app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
-app.use('/api/incidents', authenticateJWT, incidentRoutes);
-app.use('/api/location', authenticateJWT, userLocationRoutes);
+app.use('/api', checkJwt);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/incidents', incidentRoutes);
+app.use('/api/location', userLocationRoutes);
 app.use('/api', searchRoutes); // Added route for search
 
 // Global error handler
@@ -69,7 +62,7 @@ app.use(errorHandler);
 setInterval(monitorIncidents, 5 * 60 * 1000); // Run every 5 minutes
 
 const server = createServer(app);
-initializeSocket(server);
+initializeSocketIO(server);
 
 server.listen(process.env.PORT || 3001, () => {
   console.log(`Server started on port ${process.env.PORT || 3001}`);
