@@ -2,7 +2,7 @@
 
 import Homepage from "./Homepage/page";
 import Layout from "@/components/Layout";
-import Header from "@/components/Header";
+import { Header } from "@/components/Header";
 
 export default function Page() {
   return (

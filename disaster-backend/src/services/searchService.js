@@ -1,8 +1,10 @@
+console.log('Loading searchService.js');
 import { PineconeStore } from '@langchain/pinecone';
 import { OpenAI } from '@langchain/openai';
 import { Pinecone } from '@pinecone-database/pinecone';
-import IncidentReport from '../models/incidentReport.js';
+//import IncidentReport from '../models/incidentReport.js';
 import { FuzzySearch } from 'fuzzy-search';
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY,
@@ -89,25 +91,27 @@ export async function addToVectorStore(incident) {
 }
 
 export async function updateVectorStore(incident) {
-  const { _id, type, description, latitude, longitude } = incident;
+  const { id, type, description, latitude, longitude } = incident;
   const embedding = await generateEmbedding(`${type} ${description}`);
 
+  const vectorStore = await initializeVectorStore();
   await vectorStore.update([
     {
-      id: _id.toString(),
+      id: id,
       values: embedding,
       metadata: { 
         type, 
         description, 
         latitude, 
         longitude,
-        reportId: _id
+        reportId: id
       }
     }
   ]);
 }
 
 export async function deleteFromVectorStore(incidentId) {
+  const vectorStore = await initializeVectorStore();
   await vectorStore.delete([incidentId.toString()]);
 }
 

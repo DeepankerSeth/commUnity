@@ -1,7 +1,8 @@
+console.log('Loading feedbackService.js');
 import Feedback from '../models/Feedback.js';
 import { updateRiskScoring } from './riskScoringService.js';
 import { updateIncidentBasedOnFeedback } from './incidentService.js';
-import { getUserFromAuth0, updateUserInAuth0 } from './auth0Service.js';
+// import { getUserFromAuth0, updateUserInAuth0 } from './auth0Service.js';
 
 export async function processFeedback(feedbackData) {
   const feedback = new Feedback(feedbackData);

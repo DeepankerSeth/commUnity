@@ -1,24 +1,38 @@
-import IncidentReport from '../models/incidentReport.js';
-import { emitIncidentUpdate } from './socketService.js';
-import { updateRiskScoring } from './riskScoringService.js';
+import { processIncident } from '../ai/llmProcessor.js';
+import { getIncidentReportsNeo4j, updateIncidentReport } from './graphDatabaseService.js';
+
+export async function createNewIncidentReport(incidentData) {
+  const analysis = await processIncident(incidentData);
+  return createNewIncidentReportNeo4j({ ...incidentData, ...analysis });
+}
+
+export async function getIncidentReport(id) {
+  return getIncidentReportsNeo4j(id);
+}
 
 export async function updateIncidentBasedOnFeedback(incidentId, accuracy, usefulness) {
-  const incident = await IncidentReport.findById(incidentId);
-  if (!incident) throw new Error('Incident not found');
+  const incident = await getIncidentReport(incidentId);
+  if (!incident) {
+    throw new Error('Incident not found');
+  }
 
-  const severityAdjustment = (accuracy - 3) * 0.1; // Range: -0.2 to +0.2
-  incident.severity = Math.max(1, Math.min(10, incident.severity + severityAdjustment));
+  // Adjust severity based on feedback
+  const severityAdjustment = (accuracy - 3) * 0.2; // Range: -0.4 to +0.4
+  incident.severity = Math.max(1, Math.min(5, incident.severity + severityAdjustment));
 
-  const radiusAdjustment = (usefulness - 3) * 0.05; // Range: -0.1 to +0.1 miles
-  incident.impactRadius = Math.max(0.1, incident.impactRadius + radiusAdjustment);
-
-  await incident.save();
-
-  // Emit incident update to all connected clients
-  emitIncidentUpdate(incident._id, {
-    severity: incident.severity,
-    impactRadius: incident.impactRadius
+  // Reprocess the incident with the updated information
+  const updatedAnalysis = await processIncident({
+    ...incident,
+    userFeedback: { accuracy, usefulness }
   });
 
-  await updateRiskScoring(incidentId, accuracy);
+  // Update the incident report
+  const updatedIncident = await updateIncidentReport(incidentId, {
+    severity: incident.severity,
+    analysis: updatedAnalysis.analysis,
+    impactRadius: updatedAnalysis.impactRadius,
+    // Add any other fields that might be affected by the feedback
+  });
+
+  return updatedIncident;
 }

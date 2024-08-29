@@ -1,6 +1,7 @@
 // Automated Plan Generation System
 
 // src/services/planGeneration.js
+console.log('Loading planGeneration.js');
 const generatePlan = (disasterData) => {
 
     // Implement plan generation logic

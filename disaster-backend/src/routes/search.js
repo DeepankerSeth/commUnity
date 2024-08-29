@@ -1,3 +1,4 @@
+console.log('Loading search.js');
 import express from 'express';
 import { performHybridSearch, getFacets } from '../services/searchService.js';
 

@@ -1,3 +1,4 @@
+console.log('Loading advancedQueryService.js');
 import {
   getRelatedIncidents,
   getIncidentsByLocation,

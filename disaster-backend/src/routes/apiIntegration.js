@@ -1,3 +1,4 @@
+console.log('Loading apiIntegration.js');
 import express from 'express';
 import { getIncidents, createIncident, updateIncident, deleteIncident } from '../controllers/apiIntegrationController.js';
 import { authenticateApiKey } from '../middleware/apiAuth.js';

@@ -1,7 +1,8 @@
-import IncidentReport from '../models/incidentReport.js';
+console.log('Loading verificationService.js');
+//import IncidentReport from '../models/incidentReport.js';
 import axios from 'axios';
 import { emitVerificationUpdate } from './socketService.js';
-import { getUsersFromAuth0 } from '../services/auth0Service.js';
+// import { getUsersFromAuth0 } from '../services/auth0Service.js';
 
 const OFFICIAL_SOURCE_API = process.env.OFFICIAL_SOURCE_API;
 
@@ -9,7 +10,7 @@ export async function verifyIncident(incidentId) {
   const incident = await IncidentReport.findById(incidentId);
   if (!incident) throw new Error('Incident not found');
 
-  const userVerification = await getUserVerification(incident);
+  //const userVerification = await getUserVerification(incident);
   const officialVerification = await getOfficialVerification(incident);
   const aiVerification = await getAIVerification(incident);
 
@@ -44,25 +45,25 @@ export async function verifyIncident(incidentId) {
   };
 }
 
-async function getUserVerification(incident) {
-  const nearbyUsers = await getUsersFromAuth0({
-    location: {
-      $near: {
-        $geometry: {
-          type: "Point",
-          coordinates: [incident.longitude, incident.latitude]
-        },
-        $maxDistance: 5000 // 5km radius
-      }
-    },
-    reputation: { $gte: 50 } // Only consider users with good reputation
-  });
+// async function getUserVerification(incident) {
+//   const nearbyUsers = await getUsersFromAuth0({
+//     location: {
+//       $near: {
+//         $geometry: {
+//           type: "Point",
+//           coordinates: [incident.longitude, incident.latitude]
+//         },
+//         $maxDistance: 5000 // 5km radius
+//       }
+//     },
+//     reputation: { $gte: 50 } // Only consider users with good reputation
+//   });
 
-  const verifications = await Promise.all(nearbyUsers.map(user => checkUserVerification(user, incident)));
-  const positiveVerifications = verifications.filter(v => v).length;
+//   const verifications = await Promise.all(nearbyUsers.map(user => checkUserVerification(user, incident)));
+//   const positiveVerifications = verifications.filter(v => v).length;
 
-  return positiveVerifications / nearbyUsers.length;
-}
+//   return positiveVerifications / nearbyUsers.length;
+// }
 
 async function checkUserVerification(user, incident) {
   // Implement logic to check if user has verified the incident

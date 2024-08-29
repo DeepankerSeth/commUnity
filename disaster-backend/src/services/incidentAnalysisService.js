@@ -1,4 +1,5 @@
 // src/services/incidentAnalysisService.js
+console.log('Loading incidentAnalysisService.js');
 import { getDistance } from 'geolib';
 
 export function calculateDynamicImpactZone(incident, allIncidents) {

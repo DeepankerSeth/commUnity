@@ -5,6 +5,8 @@
 // Added comments for clarity.
 // Placeholder for optimization algorithms.
 
+console.log('Loading evacuationService.js');
+
 // src/services/evacuationService.js
 import { getEvacuationRoute } from './mappingService.js';
 

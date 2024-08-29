@@ -1,3 +1,4 @@
+console.log('Loading socketService.js');
 import { Server } from 'socket.io';
 
 let io;

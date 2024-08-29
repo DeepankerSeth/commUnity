@@ -1,5 +1,5 @@
 // Purpose: Clean and preprocess data.
-
+console.log('Loading dataCleaning.js');
 // src/utils/dataCleaning.js
 import { cleanData } from './dataCleaning';
 

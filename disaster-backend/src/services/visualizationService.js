@@ -1,4 +1,5 @@
-import IncidentReport from '../models/incidentReport.js';
+console.log('Loading visualizationService.js');
+//import IncidentReport from '../models/incidentReport.js';
 
 export async function getHeatmapData() {
   const incidents = await IncidentReport.find({}, 'location severity');

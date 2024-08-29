@@ -1,4 +1,5 @@
 // src/services/riskScoringService.js
+console.log('Loading riskScoringService.js');
 import { getDistance } from 'geolib';
 import { getFeedbackStats } from './feedbackService.js';
 

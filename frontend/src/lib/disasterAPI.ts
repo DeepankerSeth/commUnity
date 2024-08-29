@@ -1,25 +1,34 @@
 import axios from 'axios';
-import { getSession } from '@auth0/nextjs-auth0';
 
-const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3002';
+const DISASTER_API_URL = process.env.NEXT_PUBLIC_DISASTER_API_URL || 'http://localhost:3001';
 
 const api = axios.create({
   baseURL: DISASTER_API_URL,
 });
 
-api.interceptors.request.use(async (config) => {
-  const session = await getSession();
-  if (session?.accessToken) {
-    config.headers.Authorization = `Bearer ${session.accessToken}`;
-  }
-  return config;
-});
-
 export const reportIncident = async (formData: FormData) => {
-  const response = await api.post('/api/incidents', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-  return response.data;
+  try {
+    console.log('formData: ', formData.get('description'));
+    const response = await api.post('/api/incidents', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    console.log('response: ',response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error(api.getUri());
+    console.error('Error reporting incident:', error);
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      throw new Error(error.response.data.error || 'Server error');
+    } else if (error.request) {
+      // The request was made but no response was received
+      throw new Error('No response received from server');
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      throw new Error('Error setting up the request');
+    }
+  }
 };
 
 export const getIncidents = async () => {

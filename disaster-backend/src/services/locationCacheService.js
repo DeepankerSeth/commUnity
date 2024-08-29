@@ -1,3 +1,4 @@
+console.log('Loading locationCacheService.js');
 import NodeCache from 'node-cache';
 
 const locationCache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour

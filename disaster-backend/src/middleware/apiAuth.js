@@ -1,3 +1,4 @@
+console.log('Loading apiAuth.js');
 import ApiKey from '../models/apiKey.js';
 
 export const authenticateApiKey = async (req, res, next) => {

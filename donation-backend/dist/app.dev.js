@@ -22,9 +22,6 @@ var swaggerUi = require('swagger-ui-express');
 
 var YAML = require('yamljs');
 
-var _require = require('./src/middleware/auth'),
-    authenticateJWT = _require.authenticateJWT;
-
 require('dotenv').config();
 
 var app = express();
@@ -41,9 +38,7 @@ var limiter = rateLimit({
 
 });
 app.use(limiter);
-app.use(requestId); // Use JWT authentication middleware
-
-app.use('/api', authenticateJWT);
+app.use(requestId);
 app.use('/api/charities', charityRoutes);
 var swaggerDocument = YAML.load('./src/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

@@ -12,28 +12,34 @@ import dashboardRoutes from './src/routes/dashboard.js';
 import apiForMobileRoutes from './src/routes/api.js';
 import incidentRoutes from './src/routes/incidentRoutes.js';
 import errorHandler from './src/middleware/errorHandler.js';
-import dotenv from 'dotenv';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
+import searchRoutes from './src/routes/search.js';
 import userLocationRoutes from './src/routes/userLocation.js';
 import { createServer } from 'http';
 import { initializeSocketIO } from './src/services/socketService.js';
-import searchRoutes from './src/routes/search.js'; // Added import for search routes
-import { checkJwt } from './src/middleware/auth0Middleware.js';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 const app = express();
 
-dotenv.config();
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
-app.use(bodyParser.json());
-app.use('/incidents', incidentRoutes);
+// console.log('__dirname:', __dirname);
+
+// dotenv.config({ path: path.join(__dirname, '.env') });
+
+app.use(express.json());
 
 // Security middleware
 app.use(helmet()); // Protects against well-known vulnerabilities
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 })); // Enables CORS for all routes
+
 
 // Rate limiting middleware
 const limiter = rateLimit({
@@ -49,7 +55,6 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Use routes
-app.use('/api', checkJwt);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/location', userLocationRoutes);
@@ -60,12 +65,5 @@ app.use(errorHandler);
 
 // Start the incident monitoring worker
 setInterval(monitorIncidents, 5 * 60 * 1000); // Run every 5 minutes
-
-const server = createServer(app);
-initializeSocketIO(server);
-
-server.listen(process.env.PORT || 3001, () => {
-  console.log(`Server started on port ${process.env.PORT || 3001}`);
-});
 
 export default app;

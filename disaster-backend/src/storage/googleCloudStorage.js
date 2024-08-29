@@ -1,3 +1,4 @@
+console.log('Loading googleCloudStorage.js');
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 

@@ -1,7 +1,8 @@
 // Creating customizable alert preferences
 
 // src/controllers/alertPreferencesController.js
-import { getUserFromAuth0, updateUserInAuth0 } from '../services/auth0Service.js';
+// import { getUserFromAuth0, updateUserInAuth0 } from '../services/auth0Service.js';
+console.log('Loading alertPreferencesController.js');
 
 const updatePreferences = async (req, res) => {
   try {

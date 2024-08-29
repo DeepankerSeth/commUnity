@@ -1,3 +1,4 @@
+console.log('Loading userLocation.js');
 import express from 'express';
 import axios from 'axios';
 

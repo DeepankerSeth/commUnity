@@ -1,9 +1,10 @@
+console.log('Loading monitorIncidents.js');
 // workers/monitorIncidents.js
 import dotenv from 'dotenv';
 import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
-import IncidentReport from '../models/incidentReport.js';
+import { getIncidentReport } from '../services/incidentService.js';
 import { getIncidentUpdates, processIncident } from '../ai/llmProcessor.js';
 import { OpenAI } from 'openai';
 import { calculateDynamicImpactZone } from '../services/incidentAnalysisService.js';
@@ -11,46 +12,44 @@ import { generateNotification, sendNotification } from '../services/notification
 import { getClusterData } from '../services/clusteringService.js';
 import { emitIncidentUpdate, emitNewIncident, emitVerificationUpdate, emitClusterUpdate } from '../services/socketService.js';
 import { verifyIncident } from '../services/verificationService.js';
-import { checkGeofencesAndNotify } from '../services/geofencingService.js';
+// import { checkGeofencesAndNotify } from '../services/geofencingService.js';
 import {
   createIncidentNode,
   createKeywordRelationships,
   createLocationRelationship,
   getRelatedIncidents
 } from '../services/graphDatabaseService.js';
-import { getUsersFromAuth0 } from '../services/auth0Service.js';
 import { generateStatistics } from '../services/statisticsService.js';
 
 dotenv.config();
 
-const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY
-});
-const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY,
+  //environment: "us-east-1-aws"
+});
+
+// mongoose.connect("mongodb://localhost:27017/commUnity", { useNewUrlParser: true, useUnifiedTopology: true });
 
 let vectorStore;
 
-async function initializeVectorStore() {
-  if (!vectorStore) {
-    vectorStore = await PineconeStore.fromExistingIndex(
-      new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
-      { pineconeIndex }
-    );
-  }
+async function setupVectorStore() {
+  vectorStore = await initializeVectorStore();
 }
+
+setupVectorStore();
 
 let isMonitoring = false;
 
 async function monitorIncidents() {
-  await initializeVectorStore();
+  await setupVectorStore();
 
   if (isMonitoring) return;
   isMonitoring = true;
 
   try {
-    const recentIncidents = await IncidentReport.find({
+    const recentIncidents = await getIncidentReport({
       createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes
     });
 
@@ -79,20 +78,20 @@ async function monitorIncidents() {
       const relatedIncidents = await getRelatedIncidents(incident._id.toString());
 
       // Notify nearby users
-      await notifyNearbyUsers(incident);
+     // await notifyNearbyUsers(incident);
 
       // Check geofences and notify users
-      await checkGeofencesAndNotify(incident);
+     // await checkGeofencesAndNotify(incident);
 
       // Verify incident
-      const verificationResult = await verifyIncident(incident._id);
-      incident.verificationScore = verificationResult.verificationScore;
-      incident.verificationStatus = verificationResult.verificationStatus;
+      // const verificationResult = await verifyIncident(incident._id);
+      // incident.verificationScore = verificationResult.verificationScore;
+      // incident.verificationStatus = verificationResult.verificationStatus;
       await incident.save();
 
       // Emit updated incident data to all connected clients
       emitIncidentUpdate(incident._id, incident);
-      emitVerificationUpdate(incident._id, verificationResult.verificationScore, verificationResult.verificationStatus);
+      // emitVerificationUpdate(incident._id, verificationResult.verificationScore, verificationResult.verificationStatus);
     }
 
     // Perform clustering
@@ -113,24 +112,24 @@ async function monitorIncidents() {
   }
 }
 
-async function notifyNearbyUsers(incident) {
-  const nearbyUsers = await getUsersFromAuth0({
-    location: {
-      $near: {
-        $geometry: {
-          type: "Point",
-          coordinates: [incident.location.coordinates[1], incident.location.coordinates[0]]
-        },
-        $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
-      }
-    }
-  });
+// async function notifyNearbyUsers(incident) {
+//   const nearbyUsers = await getUsersFromAuth0({
+//     location: {
+//       $near: {
+//         $geometry: {
+//           type: "Point",
+//           coordinates: [incident.location.coordinates[1], incident.location.coordinates[0]]
+//         },
+//         $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
+//       }
+//     }
+//   });
 
-  for (const user of nearbyUsers) {
-    const notification = generateNotification(incident, user.location);
-    await sendNotification(user, notification);
-  }
-}
+//   for (const user of nearbyUsers) {
+//     const notification = generateNotification(incident, user.location);
+//     await sendNotification(user, notification);
+//   }
+// }
 
 async function updateLLMModel() {
   try {

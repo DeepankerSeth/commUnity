@@ -1,3 +1,4 @@
+console.log('Loading mediaAnalysisService.js');
 import vision from '@google-cloud/vision';
 import { VideoIntelligenceServiceClient } from '@google-cloud/video-intelligence';
 import { Storage } from '@google-cloud/storage';

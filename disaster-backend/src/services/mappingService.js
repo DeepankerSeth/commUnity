@@ -5,6 +5,7 @@
 // Integrated with Google Maps API.
 
 // src/services/mappingService.js
+console.log('Loading mappingService.js');
 import axios from 'axios';
 
 // Function to get evacuation route from a mapping API

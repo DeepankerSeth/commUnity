@@ -1,4 +1,5 @@
-import IncidentReport from '../models/incidentReport.js';
+console.log('Loading apiIntegrationController.js');
+import { getIncidentReport } from '../../services/incidentService.js';
 import { processIncident } from '../ai/llmProcessor.js';
 import { emitNewIncident, emitIncidentUpdate } from '../services/socketService.js';
 import { uploadFile } from '../services/storageService.js';
@@ -11,7 +12,7 @@ export const getIncidents = async (req, res) => {
     if (severity) query.severity = parseInt(severity);
     if (status) query.status = status;
 
-    const incidents = await IncidentReport.find(query)
+    const incidents = await getIncidentReport(query)
       .limit(parseInt(limit))
       .skip(parseInt(offset))
       .sort({ createdAt: -1 });
@@ -23,47 +24,12 @@ export const getIncidents = async (req, res) => {
   }
 };
 
-export const createIncident = async (req, res) => {
-  try {
-    const { type, description, latitude, longitude } = req.body;
-    const files = req.files;
-
-    const mediaUrls = await Promise.all(files.map(file => uploadFile(file)));
-
-    const newIncident = new IncidentReport({
-      type,
-      description,
-      location: {
-        type: 'Point',
-        coordinates: [longitude, latitude]
-      },
-      mediaUrls,
-      status: 'active'
-    });
-
-    const analysis = await processIncident(newIncident);
-    newIncident.type = analysis.type;
-    newIncident.title = analysis.title;
-    newIncident.analysis = analysis.analysis;
-    newIncident.severity = analysis.severity;
-    newIncident.impactRadius = analysis.impactRadius;
-
-    await newIncident.save();
-    emitNewIncident(newIncident);
-
-    res.status(201).json(newIncident);
-  } catch (error) {
-    console.error('Error creating incident:', error);
-    res.status(500).json({ error: 'An error occurred while creating the incident', details: error.message });
-  }
-};
-
 export const updateIncident = async (req, res) => {
   try {
     const { id } = req.params;
     const { type, description, latitude, longitude, severity, status } = req.body;
 
-    const incident = await IncidentReport.findById(id);
+    const incident = await getIncidentReport(id);
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }
@@ -94,7 +60,7 @@ export const updateIncident = async (req, res) => {
 export const deleteIncident = async (req, res) => {
   try {
     const { id } = req.params;
-    const incident = await IncidentReport.findByIdAndDelete(id);
+    const incident = await getIncidentReport(id);
     if (!incident) {
       return res.status(404).json({ error: 'Incident not found' });
     }

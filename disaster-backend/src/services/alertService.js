@@ -1,9 +1,9 @@
 // Purpose: Send multi-channel alerts based on user preferences.
-
+console.log('Loading alertService.js');
 // src/services/alertService.js
 import twilio from 'twilio'; // Example for SMS
 import nodemailer from 'nodemailer'; // Example for email
-import { getUserFromAuth0 } from './auth0Service.js';
+// import { getUserFromAuth0 } from './auth0Service.js';
 
 // Twilio configuration for SMS
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);

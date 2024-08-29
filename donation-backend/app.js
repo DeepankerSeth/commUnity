@@ -9,7 +9,6 @@ const rateLimit = require('express-rate-limit');
 const requestId = require('./src/middleware/requestId');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
-const { authenticateJWT } = require('./src/middleware/auth');
 require('dotenv').config();
 
 const app = express();
@@ -28,9 +27,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 app.use(requestId);
-
-// Use JWT authentication middleware
-app.use('/api', authenticateJWT);
 
 app.use('/api/charities', charityRoutes);
 

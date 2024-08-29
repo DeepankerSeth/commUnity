@@ -1,3 +1,4 @@
+console.log('Loading locationService.js');
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import geohash from 'ngeohash';

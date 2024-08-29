@@ -1,20 +1,20 @@
+console.log('Loading langchain.js');
 import { OpenAI } from '@langchain/openai';
 import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { queryVectors } from '../db/pinecone';
-import { createIncidentReport, getIncidentUpdates } from './llmProcessor';
+import { createNewIncidentReport } from './incidentService';
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY,
-  environment: process.env.PINECONE_ENVIRONMENT,
-});
-const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
-const vectorStore = await PineconeStore.fromExistingIndex(
-  new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
-  { pineconeIndex }
-);
+let vectorStore;
+
+async function setupVectorStore() {
+  vectorStore = await initializeVectorStore();
+}
+
+setupVectorStore();
 
 const processIncident = async (incident) => {
   const { description, type, latitude, longitude, mediaUrls } = incident;
@@ -34,7 +34,7 @@ Analyze this incident report and provide the following:
 `;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: 'You are a disaster response AI assistant.' },
       { role: 'user', content: prompt }

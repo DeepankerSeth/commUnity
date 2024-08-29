@@ -1,8 +1,8 @@
+console.log('Loading notificationService.js');
 import Notification from '../models/notification.js';
-import IncidentReport from '../models/incidentReport.js';
+//import IncidentReport from '../models/incidentReport.js';
 import { calculateRiskScore } from './riskScoringService.js';
 import { emitNotification } from './socketService.js';
-import { getUsersFromAuth0 } from '../services/auth0Service.js';
 
 export async function checkSimilarIncidentsAndNotify(newIncident) {
   const similarIncidents = await IncidentReport.find({

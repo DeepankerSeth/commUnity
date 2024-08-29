@@ -1,12 +1,14 @@
 // API Gateway
 // Purpose: Proxy requests to the disaster service.
 
-// src/routes/apiGateway.js
+// src/middleware/apiGateway.js
+console.log('Loading apiGateway.js');
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const router = express.Router();
 
+console.log('API_GATEWAY_URL:', process.env.API_GATEWAY_URL);
 const target = process.env.API_GATEWAY_URL;
 
 if (!target) {

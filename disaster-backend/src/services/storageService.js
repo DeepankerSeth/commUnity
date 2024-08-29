@@ -1,3 +1,4 @@
+console.log('Loading storageService.js');
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import dotenv from 'dotenv';

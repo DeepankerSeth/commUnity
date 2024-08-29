@@ -1,7 +1,8 @@
 // Creating a user-friendly interface for evacuation instructions
 
 // src/controllers/evacuationController.js
-import { optimizeEvacuationRoute } from '../services/evacuationService';
+console.log('Loading evacuationController.js');
+import { optimizeEvacuationRoute } from '../../services/evacuationService';
 
 // Controller function to get evacuation instructions
 const getEvacuationInstructions = async (req, res, next) => {

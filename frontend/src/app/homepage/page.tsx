@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ReportIncidentForm from "@/components/ReportIncidentForm";
 import { getIncidents } from '@/lib/disasterAPI';
 import { Input } from "@/components/ui/input";
-import Image from "next/image";
+import { Search, AlertTriangle, Activity, Users } from "lucide-react";
 import Footer from "@/components/Footer";
 
 export default function Homepage() {
@@ -27,6 +27,7 @@ export default function Homepage() {
       }
     };
     fetchIncidents();
+
     return () => {
       isMounted = false;
     };
@@ -40,49 +41,80 @@ export default function Homepage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-between min-h-screen bg-white px-4 py-16 sm:px-6 lg:px-8">
-      <div className="w-full max-w-xl space-y-16">
-        <div className="text-center">
-          <h1 className="text-5xl font-bold tracking-tight text-gray-900">commUnity</h1>
-          <p className="mt-4 text-lg text-gray-600">United in Resilience</p>
+    <div className="min-h-screen flex flex-col items-center p-8 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+      
+      <main className="flex flex-col items-center w-full max-w-4xl text-center relative z-10">
+        <h1 className="text-5xl sm:text-6xl font-bold text-gray-700 dark:text-gray-300 mb-4">
+          comm<span className="text-gray-900 dark:text-gray-100">Unity</span>
+        </h1>
+        <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">United in Resilience</p>
+        
+        <div className="relative w-full max-w-2xl mb-8">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <Input 
+            type="search" 
+            placeholder="Search incidents or locations" 
+            className="w-full pl-10 pr-4 py-3 rounded-full border-2 border-gray-200 dark:border-gray-700 focus:border-gray-400 dark:focus:border-gray-500 focus:ring focus:ring-gray-200 dark:focus:ring-gray-800 focus:ring-opacity-50 transition-all bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-gray-100"
+          />
         </div>
-        <div className="mt-12">
-          <Input type="search" placeholder="Search incidents or locations" className="w-full h-12 px-4 rounded-full shadow-sm text-lg" />
+        
+        <Button 
+          onClick={toggleReportIncident}
+          className="w-full max-w-md text-lg sm:text-xl py-4 sm:py-5 bg-gray-800 hover:bg-gray-700 dark:bg-gray-200 dark:hover:bg-gray-300 text-white dark:text-gray-800 font-bold rounded-full shadow-md hover:shadow-lg transition-all duration-300 mb-10 transform hover:scale-105"
+        >
+          Report an Incident
+        </Button>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl mb-12">
+          <Link href="/monitor" passHref>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center justify-center h-32 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full"
+            >
+              <Activity className="w-8 h-8 text-blue-600 dark:text-blue-400 mb-2" />
+              <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">Monitor</span>
+            </Button>
+          </Link>
+          <Link href="/evacuation" passHref>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center justify-center h-32 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full"
+            >
+              <Users className="w-8 h-8 text-green-600 dark:text-green-400 mb-2" />
+              <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">Evacuation</span>
+            </Button>
+          </Link>
+          <Link href="/donate" passHref>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center justify-center h-32 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full"
+            >
+              <AlertTriangle className="w-8 h-8 text-amber-600 dark:text-amber-400 mb-2" />
+              <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">Donate</span>
+            </Button>
+          </Link>
         </div>
-        <div className="flex flex-col gap-6 mt-12">
-          <Button onClick={toggleReportIncident} className="w-full h-12 bg-black text-white hover:bg-gray-800 text-lg">
-            Report an Incident
-          </Button>
-          <div className="flex justify-between gap-4">
-            <Link href="/monitor" passHref className="flex-1">
-              <Button variant="outline" className="w-full h-12 text-lg">Monitor</Button>
-            </Link>
-            <Link href="/evacuation" passHref className="flex-1">
-              <Button variant="outline" className="w-full h-12 text-lg">Evacuation</Button>
-            </Link>
-            <Link href="/donate" passHref className="flex-1">
-              <Button variant="outline" className="w-full h-12 text-lg">Donate</Button>
-            </Link>
+
+        {incidents.length > 0 && (
+          <div className="w-full max-w-xl mb-12">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-gray-100">Recent Incidents</h2>
+            <ul className="space-y-4">
+              {incidents.slice(0, 3).map((incident: any) => (
+                <li key={incident.id} className="p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg shadow-sm">
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">{incident.type}</span> - {incident.location}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      </div>
-      {incidents.length > 0 && (
-        <div className="mt-16 w-full max-w-xl">
-          <h2 className="text-2xl font-semibold mb-6 text-gray-900">Recent Incidents</h2>
-          <ul className="space-y-4">
-            {incidents.slice(0, 3).map((incident: any) => (
-              <li key={incident.id} className="p-4 bg-gray-100 rounded-lg shadow-sm">
-                <span className="font-semibold">{incident.type}</span> - {incident.location}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        )}
+      </main>
+      
       {showReportIncident && (
-        <div className="mt-16 w-full max-w-xl" ref={reportIncidentRef}>
+        <div className="w-full max-w-xl mb-12" ref={reportIncidentRef}>
           <ReportIncidentForm />
         </div>
       )}
+      
       <Footer />
     </div>
   );

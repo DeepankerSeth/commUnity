@@ -1,18 +1,27 @@
-import { createIncidentReport, processIncident, updateMetadataWithFeedback } from '../ai/llmProcessor.js';
-import { checkSimilarIncidentsAndNotify } from '../services/notificationService.js';
+console.log('Loading incidentController.js');
+import { processIncident, updateMetadataWithFeedback } from '../../ai/llmProcessor.js';
+import { checkSimilarIncidentsAndNotify } from '../../services/notificationService.js';
 import { Storage } from '@google-cloud/storage';
-import { emitIncidentUpdate, emitNewIncident } from '../services/socketService.js';
-import { analyzeTrends, getPredictiveModel } from '../services/trendAnalysisService.js';
-import { getHeatmapData, getTimeSeriesData } from '../services/visualizationService.js';
-import { getUserFromAuth0 } from '../services/auth0Service.js';
-
+import { emitIncidentUpdate, emitNewIncident } from '../../services/socketService.js';
+import { analyzeTrends, getPredictiveModel } from '../../services/trendAnalysisService.js';
+import { getHeatmapData, getTimeSeriesData } from '../../services/visualizationService.js';
+import { createNewIncidentReport } from '../services/incidentService.js';
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 
 export const createIncident = async (req, res) => {
   try {
+    console.log('Received incident data:', req.body);
     const { type, description, latitude, longitude } = req.body;
-    const mediaFiles = req.files;
+    const mediaFiles = req.files || [];
+
+    let location;
+    if (latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude))) {
+      location = {
+        type: 'Point',
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+      };
+    }
 
     // Upload media files to Google Cloud Storage
     const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
@@ -26,9 +35,8 @@ export const createIncident = async (req, res) => {
       });
     }));
 
-    // Create incident report
     const incidentData = { type, description, latitude, longitude, mediaUrls };
-    const incidentReport = await createIncidentReport(incidentData);
+    const incidentReport = await createNewIncidentReport(incidentData);
 
     // Process the incident
     const analysis = await processIncident(incidentReport);
@@ -38,7 +46,6 @@ export const createIncident = async (req, res) => {
     incidentReport.severity = analysis.severity;
     incidentReport.impactRadius = analysis.impactRadius;
     incidentReport.metadata = analysis.metadata;
-    await incidentReport.save();
 
     // Emit new incident event
     emitNewIncident(incidentReport);

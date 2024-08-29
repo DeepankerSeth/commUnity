@@ -1,153 +1,73 @@
 // server.js
-import 'dotenv/config';
-import express from 'express';
-import multer from 'multer';
-import { Storage } from '@google-cloud/storage';
-import speech from '@google-cloud/speech';
-import mongoose from 'mongoose';
-import app from './app.js';
-import { monitorIncidents } from './src/workers/monitorIncidents.js';
-import { createIncidentReport, getIncidentUpdates, processIncident, getIncidentTimeline } from './src/ai/llmProcessor.js';
-import cors from 'cors';
-import { checkSimilarIncidentsAndNotify } from './src/services/notificationService.js';
 import http from 'http';
+import app from './app.js';
 import { initializeSocketIO } from './src/services/socketService.js';
-import { getTrendAnalysis, getPredictions, getVisualizationData } from './src/controllers/incidentController.js';
-import apiIntegrationRoutes from './src/routes/apiIntegration.js';
+import { initializeNeo4j } from './src/config/neo4jConfig.js';
+import { monitorIncidents } from './src/workers/monitorIncidents.js';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+console.log('Loading server.js');
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
-// Initialize Google Cloud Storage
-const storage = new Storage();
-const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
+// dotenv.config({ path: path.join(__dirname, '.env') });
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
-});
+//console.log('__dirname:', __dirname);
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+console.log('PINECONE_API_KEY:', process.env.PINECONE_API_KEY);
 
-// Initialize Google Cloud Speech-to-Text client
-const speechClient = new speech.SpeechClient();
+const PORT = parseInt(process.env.PORT) || 3001;
+const MAX_PORT_ATTEMPTS = 10;
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-const PORT = process.env.PORT || 3000;
-const server = http.createServer(app);
-initializeSocketIO(server);
-
-export { server };
-
-app.use(express.json());
-
-/**
- * API endpoint for reporting incidents
- * Accepts media (will only support photos currently), and file uploads along with a description
- */
-
-// Report an incident
-app.post('/api/incidents', upload.array('mediaFiles'), async (req, res) => {
-  try {
-    const { userId, type, description, latitude, longitude } = req.body;
-    const mediaFiles = req.files;
-
-    // Upload media files to Google Cloud Storage
-    const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
-      const blob = bucket.file(`${Date.now()}-${file.originalname}`);
-      const blobStream = blob.createWriteStream();
-
-      return new Promise((resolve, reject) => {
-        blobStream.on('error', (err) => reject(err));
-        blobStream.on('finish', () => resolve(blob.publicUrl()));
-        blobStream.end(file.buffer);
-      });
-    }));
-
-    // Create incident report
-    const incidentData = { userId, type, description, latitude, longitude, mediaUrls };
-    const incidentReport = await createIncidentReport(incidentData);
-
-    // Process the incident
-    const analysis = await processIncident(incidentReport);
-
-    // Update the incident report with the analysis
-    incidentReport.analysis = analysis.analysis;
-    incidentReport.severity = analysis.severity;
-    incidentReport.impactRadius = analysis.impactRadius;
-    await incidentReport.save();
-
-    // Check for similar incidents and send notifications if necessary
-    await checkSimilarIncidentsAndNotify(incidentReport);
-
-    res.status(201).json({ 
-      message: 'Incident reported and analyzed successfully', 
-      incidentId: incidentReport._id,
-      analysis: analysis.analysis,
-      severity: analysis.severity,
-      impactRadius: analysis.impactRadius
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'An error occurred while reporting and analyzing the incident' });
+async function startServer(attempt = 0) {
+  if (attempt >= MAX_PORT_ATTEMPTS) {
+    console.error('Failed to find an available port after multiple attempts');
+    process.exit(1);
   }
-});
 
-// Get incident updates
-app.get('/api/incidents/:id/updates', async (req, res) => {
-  try {
-    const incidentId = req.params.id;
-    const analysis = await getIncidentUpdates(incidentId);
-    res.json({ update: analysis });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'An error occurred while fetching incident updates' });
+  const currentPort = PORT + attempt;
+
+  if (currentPort >= 65536) {
+    console.error('Port number exceeded maximum allowed value');
+    process.exit(1);
   }
-});
 
-// Handle voice input
-app.post('/api/incidents/voice', upload.single('audio'), async (req, res) => {
+  const server = http.createServer(app);
+  initializeSocketIO(server);
+
   try {
-    const audio = req.file;
-    const audioBytes = audio.buffer.toString('base64');
-
-    const [response] = await speechClient.recognize({
-      audio: { content: audioBytes },
-      config: {
-        encoding: 'LINEAR16',
-        sampleRateHertz: 16000,
-        languageCode: 'en-US',
-      },
-    });
-
-    const transcription = response.results.map(result => result.alternatives[0].transcript).join('\n');
-    res.status(200).json({ transcription });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'An error occurred while processing the audio' });
-  }
-});
-
-// Start the incident monitoring worker
-monitorIncidents().catch(error => console.error('Error in monitorIncidents:', error));
-
-app.get('/api/analysis/trends', getTrendAnalysis);
-app.get('/api/analysis/predictions', getPredictions);
-app.get('/api/visualization/data', getVisualizationData);
-
-app.use('/api/v1', apiIntegrationRoutes);
-
-export default app;
-
-const startServer = (port) => {
-  server.listen(port, () => {
-    console.log(`Server started on port ${port}`);
-  }).on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.log(`Port ${port} is busy, trying the next one...`);
-      startServer(port + 1);
-    } else {
-      console.error('Server error:', error);
+    //await connectDB();
+    const neo4jConnected = await initializeNeo4j();
+    if (!neo4jConnected) {
+      console.error('Failed to connect to Neo4j. Exiting...');
+      process.exit(1);
     }
-  });
-};
+    await new Promise((resolve, reject) => {
+      server.listen(currentPort, () => {
+        console.log(`Server started on port ${currentPort}`);
+        resolve();
+      }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${currentPort} is busy, trying the next one...`);
+          reject(err);
+        } else {
+          console.error('Error starting server:', err);
+          reject(err);
+        }
+      });
+    });
+    
+    // Start the incident monitoring worker
+    monitorIncidents().catch(error => console.error('Error in monitorIncidents:', error));
+  } catch (err) {
+    if (err.code === 'EADDRINUSE') {
+      startServer(attempt + 1);
+    } else {
+      console.error('Error starting server:', err);
+      process.exit(1);
+    }
+  }
+}
 
-startServer(PORT);
+startServer();

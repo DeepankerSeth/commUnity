@@ -1,5 +1,5 @@
 //Setting up a basic Express route to serve the dashboard
-
+console.log('Loading dashboard.js');
 // src/routes/dashboard.js
 import express from 'express';
 const router = express.Router();

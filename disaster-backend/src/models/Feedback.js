@@ -1,3 +1,4 @@
+console.log('Loading Feedback.js');
 import mongoose from 'mongoose';
 
 const feedbackSchema = new mongoose.Schema({

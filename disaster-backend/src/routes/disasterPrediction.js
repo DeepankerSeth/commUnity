@@ -1,3 +1,4 @@
+console.log('Loading disasterPrediction.js');
 import express from 'express';
 const router = express.Router();
 

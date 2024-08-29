@@ -1,17 +1,15 @@
 import express from 'express';
 import { getIncidentUpdates, getIncidentTimeline } from '../ai/llmProcessor.js';
 import userLocation from './userLocation.js';
-import { checkJwt } from '../middleware/auth0Middleware.js';
 import { getClusterData } from '../services/clusteringService.js';
 import { generateStatistics } from '../services/statisticsService.js';
-import { addGeofence, removeGeofence, updateGeofence } from '../services/geofencingService.js';
+// import { addGeofence, removeGeofence, updateGeofence } from '../services/geofencingService.js';
 import { updateIncidentBasedOnFeedback } from '../services/incidentService.js';
-import { createIncident, provideFeedback } from '../controllers/incidentController.js';
+import { createIncident, provideFeedback } from '../db/controllers/incidentController.js';
 import { searchLocations, getLocationDetails } from '../services/locationService.js';
 import { performHybridSearch } from '../services/searchService.js';
 import { getIncidentCluster, getIncidentsInArea, getFullIncidentTimeline, getIncidentPropagation } from '../services/advancedQueryService.js';
 import { processFeedback } from '../services/feedbackService.js';
-import { getUserFromAuth0 } from '../services/auth0Service.js';
 import multer from 'multer';
 
 const router = express.Router();
@@ -19,9 +17,7 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-router.post('/incidents', checkJwt, upload.array('media', 5), createIncident);
-
-router.get('/incidents/:id/updates', checkJwt, async (req, res) => {
+router.get('/incidents/:id/updates', async (req, res) => {
   try {
     const incidentId = req.params.id;
     const updates = await getIncidentUpdates(incidentId);
@@ -32,9 +28,8 @@ router.get('/incidents/:id/updates', checkJwt, async (req, res) => {
   }
 });
 
-router.get('/notifications', checkJwt, async (req, res) => {
+router.get('/notifications', async (req, res) => {
   try {
-    // TODO: Implement user authentication and fetch notifications for the authenticated user
     const notifications = await Notification.find().sort({ createdAt: -1 }).limit(10);
     res.json(notifications);
   } catch (error) {
@@ -42,7 +37,7 @@ router.get('/notifications', checkJwt, async (req, res) => {
   }
 });
 
-router.get('/user-notifications', checkJwt, async (req, res) => {
+router.get('/user-notifications', async (req, res) => {
   try {
     const notifications = await Notification.find({ userId: req.user._id }).sort('-createdAt').limit(10);
     res.json(notifications);
@@ -79,7 +74,7 @@ router.get('/statistics', async (req, res) => {
   }
 });
 
-router.post('/geofences', checkJwt, async (req, res) => {
+router.post('/geofences', async (req, res) => {
   try {
     const geofences = await addGeofence(req.user._id, req.body);
     res.status(201).json(geofences);
@@ -88,7 +83,7 @@ router.post('/geofences', checkJwt, async (req, res) => {
   }
 });
 
-router.delete('/geofences/:id', checkJwt, async (req, res) => {
+router.delete('/geofences/:id', async (req, res) => {
   try {
     const geofences = await removeGeofence(req.user._id, req.params.id);
     res.json(geofences);
@@ -97,7 +92,7 @@ router.delete('/geofences/:id', checkJwt, async (req, res) => {
   }
 });
 
-router.put('/geofences/:id', checkJwt, async (req, res) => {
+router.put('/geofences/:id', async (req, res) => {
   try {
     const geofence = await updateGeofence(req.user._id, req.params.id, req.body);
     res.json(geofence);
@@ -106,7 +101,7 @@ router.put('/geofences/:id', checkJwt, async (req, res) => {
   }
 });
 
-router.post('/incidents/:id/feedback', checkJwt, async (req, res) => {
+router.post('/incidents/:id/feedback', async (req, res) => {
   try {
     const { accuracy, usefulness } = req.body;
     const feedback = await processFeedback({
@@ -121,7 +116,7 @@ router.post('/incidents/:id/feedback', checkJwt, async (req, res) => {
   }
 });
 
-router.get('/locations/search', checkJwt, async (req, res) => {
+router.get('/locations/search', async (req, res) => {
   try {
     const { query } = req.query;
     const userId = req.user.id;
@@ -132,7 +127,7 @@ router.get('/locations/search', checkJwt, async (req, res) => {
   }
 });
 
-router.get('/locations/details', checkJwt, async (req, res) => {
+router.get('/locations/details', async (req, res) => {
   try {
     const { placeId } = req.query;
     const details = await getLocationDetails(placeId);
@@ -143,7 +138,7 @@ router.get('/locations/details', checkJwt, async (req, res) => {
 });
 
 // Hybrid search route
-router.get('/incidents/search', checkJwt, async (req, res) => {
+router.get('/incidents/search', async (req, res) => {
   try {
     const { query, limit = 10 } = req.query;
     const results = await performHybridSearch(query, parseInt(limit));
@@ -154,7 +149,7 @@ router.get('/incidents/search', checkJwt, async (req, res) => {
 });
 
 // Incident cluster route
-router.get('/incidents/:id/cluster', checkJwt, async (req, res) => {
+router.get('/incidents/:id/cluster', async (req, res) => {
   try {
     const cluster = await getIncidentCluster(req.params.id);
     res.json(cluster);
@@ -164,7 +159,7 @@ router.get('/incidents/:id/cluster', checkJwt, async (req, res) => {
 });
 
 // Incidents in area route
-router.get('/incidents/area', checkJwt, async (req, res) => {
+router.get('/incidents/area', async (req, res) => {
   try {
     const { latitude, longitude, radius } = req.query;
     const incidents = await getIncidentsInArea(parseFloat(latitude), parseFloat(longitude), parseFloat(radius));
@@ -175,7 +170,7 @@ router.get('/incidents/area', checkJwt, async (req, res) => {
 });
 
 // Full incident timeline route
-router.get('/incidents/:id/timeline', checkJwt, async (req, res) => {
+router.get('/incidents/:id/timeline', async (req, res) => {
   try {
     const timeline = await getFullIncidentTimeline(req.params.id);
     res.json(timeline);
@@ -185,7 +180,7 @@ router.get('/incidents/:id/timeline', checkJwt, async (req, res) => {
 });
 
 // Incident propagation route
-router.get('/incidents/:id/propagation', checkJwt, async (req, res) => {
+router.get('/incidents/:id/propagation', async (req, res) => {
   try {
     const propagation = await getIncidentPropagation(req.params.id);
     res.json(propagation);

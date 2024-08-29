@@ -1,4 +1,4 @@
-import axios from '../services/authService';
+import axios from 'axios';
 
 const DONATION_API_URL = process.env.NEXT_PUBLIC_DONATION_API_URL || 'http://localhost:3001';
 
@@ -6,7 +6,7 @@ const api = axios.create({
   baseURL: DONATION_API_URL,
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: any) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

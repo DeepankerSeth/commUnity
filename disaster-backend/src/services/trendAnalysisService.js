@@ -1,4 +1,5 @@
-import IncidentReport from '../models/incidentReport.js';
+console.log('Loading trendAnalysisService.js');
+//import IncidentReport from '../models/incidentReport.js';
 import { OpenAI } from '@langchain/openai';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

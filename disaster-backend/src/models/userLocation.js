@@ -1,3 +1,4 @@
+console.log('Loading userLocation.js');
 import mongoose from 'mongoose';
 
 const locationSchema = new mongoose.Schema({

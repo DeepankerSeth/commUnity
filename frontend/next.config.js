@@ -4,7 +4,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*', // Change the port if necessary
+        destination: 'http://localhost:3001/api/:path*', // Adjust the port if necessary
       },
     ]
   },

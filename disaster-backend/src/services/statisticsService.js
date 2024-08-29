@@ -1,6 +1,6 @@
+console.log('Loading statisticsService.js');
 import { createClient } from 'redis';
-import IncidentReport from '../models/incidentReport.js';
-import { getUserFromAuth0 } from '../services/auth0Service.js';
+import { driver } from '../config/neo4jConfig.js';
 
 const STATS_CACHE_KEY = 'disaster_statistics';
 const STATS_CACHE_EXPIRY = 3600; // 1 hour
@@ -44,50 +44,57 @@ export async function generateStatistics(auth0Id = null) {
     return statistics;
   } catch (error) {
     console.error('Error generating statistics:', error);
-    // Return a default or empty statistics object if Redis fails
     return { weeklyStats: {}, monthlyStats: {}, heatmapData: [] };
   }
 }
 
 async function getAggregatedStats(startDate, auth0Id = null) {
-  let match = { createdAt: { $gte: startDate } };
-  if (auth0Id) {
-    match.auth0Id = auth0Id;
-  }
+  const session = driver.session();
+  try {
+    let query = `
+      MATCH (i:IncidentReport)
+      WHERE i.createdAt >= $startDate
+      ${auth0Id ? 'AND i.auth0Id = $auth0Id' : ''}
+      RETURN 
+        i.type AS type,
+        count(i) AS count,
+        avg(i.severity) AS averageSeverity,
+        avg(i.impactRadius) AS averageImpactRadius
+      ORDER BY count DESC
+    `;
 
-  return IncidentReport.aggregate([
-    { $match: match },
-    { $group: {
-      _id: '$type',
-      count: { $sum: 1 },
-      averageSeverity: { $avg: '$severity' },
-      averageImpactRadius: { $avg: '$impactRadius' }
-    }},
-    { $sort: { count: -1 } }
-  ]);
+    const result = await session.run(query, { startDate: startDate.toISOString(), auth0Id });
+    return result.records.map(record => ({
+      type: record.get('type'),
+      count: record.get('count').toNumber(),
+      averageSeverity: record.get('averageSeverity'),
+      averageImpactRadius: record.get('averageImpactRadius')
+    }));
+  } finally {
+    await session.close();
+  }
 }
 
 async function getHeatmapData(auth0Id = null) {
-  let match = {};
-  if (auth0Id) {
-    match.auth0Id = auth0Id;
-  }
+  const session = driver.session();
+  try {
+    let query = `
+      MATCH (i:IncidentReport)
+      ${auth0Id ? 'WHERE i.auth0Id = $auth0Id' : ''}
+      RETURN 
+        round(i.latitude, 2) AS lat,
+        round(i.longitude, 2) AS lng,
+        count(i) AS count,
+        avg(i.severity) AS averageSeverity
+    `;
 
-  return IncidentReport.aggregate([
-    { $match: match },
-    { $group: {
-      _id: {
-        lat: { $round: ['$latitude', 2] },
-        lng: { $round: ['$longitude', 2] }
-      },
-      count: { $sum: 1 },
-      averageSeverity: { $avg: '$severity' }
-    }},
-    { $project: {
-      _id: 0,
-      lat: '$_id.lat',
-      lng: '$_id.lng',
-      weight: { $multiply: ['$count', '$averageSeverity'] }
-    }}
-  ]);
+    const result = await session.run(query, { auth0Id });
+    return result.records.map(record => ({
+      lat: record.get('lat'),
+      lng: record.get('lng'),
+      weight: record.get('count').toNumber() * record.get('averageSeverity')
+    }));
+  } finally {
+    await session.close();
+  }
 }

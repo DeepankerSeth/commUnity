@@ -1,3 +1,4 @@
+console.log('Loading pinecone.js');
 import { PineconeClient } from 'pinecone-node';
 
 const client = new PineconeClient(process.env.PINECONE_API_KEY);

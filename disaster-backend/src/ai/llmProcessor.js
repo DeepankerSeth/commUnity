@@ -1,23 +1,20 @@
-import { OpenAI } from 'openai';
+console.log('Loading llmProcessor.js');
+import OpenAI from 'openai';
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
-import mongoose from 'mongoose';
-import IncidentReport from '../models/incidentReport.js';
+import { getIncidentReportNeo4j } from '../services/graphDatabaseService.js';
 import { uploadFile } from '../services/storageService.js';
 import { emitIncidentUpdate } from '../services/socketService.js';
 import { performClustering, getClusterData } from '../services/clusteringService.js';
 import { verifyIncident } from '../services/verificationService.js';
-import {
-  createIncidentNode,
-  createKeywordRelationships,
-  createLocationRelationship,
-  getRelatedIncidents
-} from '../services/graphDatabaseService.js';
 import { performHybridSearch } from '../services/searchService.js';
 import path from 'path';
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
-// Initialize OpenAI client
+const apiKey = process.env.OPENAI_API_KEY;
+console.log('Using OpenAI API Key:', apiKey.substring(0, 10) + '...');
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -27,19 +24,20 @@ const embeddings = new OpenAIEmbeddings({
   openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
+console.log('Embeddings object:', embeddings);
+console.log('Embeddings methods:', Object.keys(embeddings));
+
 // Initialize Pinecone
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY
+  apiKey: process.env.PINECONE_API_KEY,
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+console.log('OPENAI_API_KEY in llmProcessor working:', process.env.OPENAI_API_KEY);
+console.log('PINECONE_API_KEY in llmProcessor working:', process.env.PINECONE_API_KEY);
 
-const vectorStore = await PineconeStore.fromExistingIndex(
-  new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
-  { pineconeIndex }
-);
+// Initialize PineconeStore with the correct embeddings object
+const vectorStore = await initializeVectorStore();
 
 /**
  * Generates an embedding using OpenAI
@@ -48,11 +46,14 @@ const vectorStore = await PineconeStore.fromExistingIndex(
  */
 export async function generateEmbedding(text) {
   try {
-    const response = await embeddings.embeddings.create({
-      model: "text-embedding-3-large",
-      input: text,
-    });
-    return response.data[0].embedding;
+    if (!text) {
+      throw new Error('Text for embedding is empty or undefined');
+    }
+    const embeddingResult = await embeddings.embedDocuments([text]);
+    if (!embeddingResult || embeddingResult.length === 0) {
+      throw new Error('Embedding generation failed');
+    }
+    return embeddingResult[0]; // Return the first (and only) embedding
   } catch (error) {
     console.error('Error generating embedding:', error);
     throw new Error('Failed to generate embedding');
@@ -64,7 +65,6 @@ export async function generateEmbedding(text) {
  * @param {Object} incident - The incident report to process
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
-
 export async function processIncident(incident) {
   try {
     const prompt = `Analyze the following incident:
@@ -79,7 +79,7 @@ Provide the following information:
 4. Assess the severity of the incident on a scale of 1-5, where 1 is minor and 5 is catastrophic.
 5. Estimate the potential impact radius in miles.
 
-Format your response as a JSON object with the following structure:
+Format your response as a JSON object with the following structure, without any markdown formatting:
 {
   "type": "string",
   "title": "string",
@@ -87,13 +87,24 @@ Format your response as a JSON object with the following structure:
   "severity": number,
   "impactRadius": number
 }`;
-    
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
+      model: "gpt-4o",
+      messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
+      temperature:0.7,
+      max_tokens:1000,
+      top_p:1
     });
 
-    const result = JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content;
+    
+    // Remove any markdown formatting and extract the JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Failed to extract JSON from API response');
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
 
     return {
       type: result.type,
@@ -116,123 +127,104 @@ Format your response as a JSON object with the following structure:
  */
 export async function updateIncident(incidentId, newReport) {
   // Fetch existing incident
-  const existingIncident = await IncidentReport.findById(incidentId);
+  const existingIncident = await getIncidentReport(incidentId);
 
   if (!existingIncident) {
     throw new Error('Incident not found');
   }
 
   const combinedDescription = `${existingIncident.description}\n\nUpdate: ${newReport.description}`;
-  const updatedIncident = { ...existingIncident.toObject(), description: combinedDescription };
+  const updatedIncident = { ...existingIncident, description: combinedDescription };
   
   const analysis = await processIncident(updatedIncident);
 
-  // Update incident in MongoDB
-  existingIncident.description = combinedDescription;
-  existingIncident.analysis = analysis.analysis;
-  existingIncident.severity = analysis.severity;
-  existingIncident.impactRadius = analysis.impactRadius;
-  existingIncident.metadata = analysis.metadata;
-  await existingIncident.save();
-
-  // Update Neo4j
-  await createIncidentNode(existingIncident);
-  await createKeywordRelationships(existingIncident._id.toString(), existingIncident.metadata.keywords);
-  await createLocationRelationship(existingIncident._id.toString(), existingIncident.metadata.placeOfImpact);
+  // Update incident in Neo4j
+  await updateIncidentReport(incidentId, {
+    description: combinedDescription,
+    analysis: analysis.analysis,
+    severity: analysis.severity,
+    impactRadius: analysis.impactRadius,
+    metadata: analysis.metadata
+  });
 
   // Get related incidents from Neo4j
-  const relatedIncidents = await getRelatedIncidents(existingIncident._id.toString());
+  const relatedIncidents = await getRelatedIncidents(incidentId);
 
   // Emit incident update to connected clients
   emitIncidentUpdate(incidentId, {
-    description: existingIncident.description,
-    analysis: existingIncident.analysis,
-    severity: existingIncident.severity,
-    impactRadius: existingIncident.impactRadius,
-    metadata: existingIncident.metadata
+    description: combinedDescription,
+    analysis: analysis.analysis,
+    severity: analysis.severity,
+    impactRadius: analysis.impactRadius,
+    metadata: analysis.metadata
   });
 
   return existingIncident;
 }
 
-/**
- * Creates a new incident report and stores it in MongoDB and Pinecone
- * @param {Object} incidentData - The incident data to store
- * @returns {Promise<Object>} - The created incident report
- */
-export async function createIncidentReport(incidentData) {
-  const { userId, type, description, latitude, longitude, mediaUrls } = incidentData;
+// /**
+//  * Creates a new incident report and stores it in Neo4j and Pinecone
+//  * @param {Object} incidentData - The incident data to store
+//  * @returns {Promise<Object>} - The created incident report
+//  */
+// export async function createNewIncidentReport(incidentData) {
+//   console.log('Received incident data:', incidentData);
+//   const { type, description, location, mediaUrls } = incidentData;
 
-  // Analyze media content
-  const mediaAnalyses = await Promise.all(mediaUrls.map(async (url) => {
-    const fileExtension = path.extname(url).toLowerCase();
-    let mediaType;
-    if (['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif'].includes(fileExtension)) {
-      mediaType = 'image';
-    } else if (['.mp4', '.avi', '.mov', '.mpg', '.mpeg', '.mpg4', '.m4v', '.mp4a', '.mp4v'].includes(fileExtension)) {
-      mediaType = 'video';
-    } else if (['.mp3', '.wav', '.ogg', '.mpga', '.m4a', '.mp4a'].includes(fileExtension)) {
-      mediaType = 'audio';
-    } else {
-      mediaType = 'file';
-    }
-    return await analyzeMedia(url, mediaType);
-  }));
+//   // Validate required fields
+//   if (!type || !description) {
+//     throw new Error('Type and description are required fields');
+//   }
 
-  const combinedDescription = `${description}\n\nMedia Analyses:\n${mediaAnalyses.join('\n')}`;
+//   // Process the incident with LLM
+//   const analysis = await processIncident({ type, description, location, mediaUrls });
 
-  // Create incident report in MongoDB
-  const incidentReport = new IncidentReport({
-    userId,
-    type,
-    description: combinedDescription,
-    location: {
-      type: 'Point',
-      coordinates: [parseFloat(longitude), parseFloat(latitude)]
-    },
-    mediaUrls,
-    timeline: [{ update: 'Incident created', timestamp: new Date() }]
-  });
-  await incidentReport.save();
+//   const incidentReport = {
+//     type,
+//     description,
+//     location,
+//     mediaUrls,
+//     analysis: analysis.analysis,
+//     severity: analysis.severity,
+//     impactRadius: analysis.impactRadius,
+//     metadata: {
+//       ...analysis.metadata,
+//       keywords: analysis.metadata?.keywords || [],
+//       incidentName: analysis.metadata?.incidentName || 'Unnamed Incident',
+//       placeOfImpact: analysis.placeOfImpact || 'Unknown Location'
+//     },
+//     timeline: [{ update: 'Incident created', timestamp: new Date() }]
+//   };
 
-  // Process the incident with LLM
-  const analysis = await processIncident(incidentReport);
-  incidentReport.analysis = analysis.analysis;
-  incidentReport.severity = analysis.severity;
-  incidentReport.impactRadius = analysis.impactRadius;
-  incidentReport.metadata = analysis.metadata;
-  await incidentReport.save();
+//   // Create vector embedding and store in Pinecone
+//   const embeddingText = `${type} ${description}`;
+//   const embedding = await generateEmbedding(embeddingText);
+//   if (embedding && embedding.length > 0) {
+//     try {
+//       await initializeVectorStore();
+//       await vectorStore.addDocuments([
+//         {
+//           pageContent: embeddingText,
+//           metadata: { 
+//             type,
+//             description, 
+//             latitude: location?.coordinates[1], 
+//             longitude: location?.coordinates[0]
+//           }
+//         }
+//       ]);
+//     } catch (error) {
+//       console.error('Error adding document to vector store:', error);
+//     }
+//   } else {
+//     console.error('Failed to generate embedding');
+//   }
 
-  // Create vector embedding
-  const embedding = await generateEmbedding(`${type} ${combinedDescription}`);
+//   // Store in Neo4j
+//   const createdIncident = await createNewIncidentReport(incidentReport);
 
-  // Store vector in Pinecone
-  const vectorId = incidentReport._id.toString();
-  await vectorStore.addDocuments([
-    {
-      id: vectorId,
-      values: embedding,
-      metadata: { 
-        type, 
-        description: combinedDescription, 
-        latitude, 
-        longitude,
-        reportId: incidentReport._id
-      }
-    }
-  ]);
-
-  // Update incident report with vector ID
-  incidentReport.vectorId = vectorId;
-  await incidentReport.save();
-
-  // Store in Neo4j
-  await createIncidentNode(incidentReport);
-  await createKeywordRelationships(incidentReport._id.toString(), incidentReport.metadata.keywords);
-  await createLocationRelationship(incidentReport._id.toString(), incidentReport.metadata.placeOfImpact);
-
-  return incidentReport;
-}
+//   return createdIncident;
+// }
 
 /**
  * Retrieves and processes similar incidents
@@ -240,7 +232,7 @@ export async function createIncidentReport(incidentData) {
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
 export async function getIncidentUpdates(incidentId) {
-  const incident = await IncidentReport.findById(incidentId);
+  const incident = await getIncidentReport(incidentId);
 
   if (!incident) {
     throw new Error('Incident not found');
@@ -276,9 +268,13 @@ export async function getIncidentUpdates(incidentId) {
   const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
+    temperature:0.7,
+  max_tokens:64,
+  top_p:1
   });
-
-  return response.choices[0].message.content;
+  const content = response.choices[0].message.content;
+  console.log(content);
+  return content;
 }
 
 /**
@@ -287,7 +283,7 @@ export async function getIncidentUpdates(incidentId) {
  * @returns {Promise<Object[]>} - The incident timeline
  */
 export async function getIncidentTimeline(incidentId) {
-  const incident = await IncidentReport.findById(incidentId);
+  const incident = await getIncidentReport(incidentId);
   if (!incident) {
     throw new Error('Incident not found');
   }
@@ -295,7 +291,7 @@ export async function getIncidentTimeline(incidentId) {
 }
 
 export async function updateMetadataWithFeedback(incidentId, userFeedback) {
-  const incident = await IncidentReport.findById(incidentId);
+  const incident = await getIncidentReport(incidentId);
 
   if (!incident) {
     throw new Error('Incident not found');
@@ -318,17 +314,15 @@ export async function updateMetadataWithFeedback(incidentId, userFeedback) {
   const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
+    temperature:0.7,
+  max_tokens:64,
+  top_p:1
   });
 
   const updatedMetadata = parseMetadataFromResponse(response.choices[0].message.content);
 
   incident.metadata = { ...incident.metadata, ...updatedMetadata };
-  await incident.save();
-
-  // Update Neo4j
-  await createIncidentNode(incident);
-  await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
-  await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
+  await updateIncidentReport(incidentId, { metadata: incident.metadata });
 
   // Log the feedback and updated metadata for future model fine-tuning
   console.log('User feedback:', userFeedback);
