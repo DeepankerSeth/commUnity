@@ -7,13 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import { promisify } from 'util';
-import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
 
 const visionClient = new vision.ImageAnnotatorClient();
 const videoIntelligenceClient = new VideoIntelligenceServiceClient();
 const storage = new Storage();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 
@@ -111,7 +109,7 @@ Provide a detailed interpretation of the content, focusing on:
 4. Any actionable insights for first responders or emergency services`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4',
     messages: [
       { role: 'system', content: 'You are an AI assistant specializing in disaster and emergency analysis.' },
       { role: 'user', content: prompt }
@@ -120,26 +118,6 @@ Provide a detailed interpretation of the content, focusing on:
   });
 
   return response.choices[0].message.content;
-}
-
-export async function analyzeIncidentImage(imageUrl) {
-  const model = new ChatOpenAI({ modelName: "gpt-4o" });
-  const prompt = PromptTemplate.fromTemplate(`
-  Analyze this image related to a disaster incident: {image}
-  
-  Provide the following information:
-  1. Description of the scene
-  2. Identified hazards or risks
-  3. Estimated severity of the incident (1-10 scale)
-  4. Recommended immediate actions
-
-  Format your response as a JSON object.
-  `);
-
-  const chain = prompt.pipe(model);
-  const response = await chain.invoke({ image: imageUrl });
-
-  return JSON.parse(response.text);
 }
 
 export { analyzeMedia };

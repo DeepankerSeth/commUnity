@@ -19,7 +19,6 @@ import { initializeSocket, getSocket } from '@/lib/socket';
 import { Dashboard } from '@/components/Dashboard';
 import { ApiKeyManagement } from '@/components/ApiKeyManagement';
 import { useDebounce } from 'use-debounce';
-import { useGeolocation } from '@/hooks/useGeoLocation'; // Add this import
 
 interface Incident {
   _id: string;
@@ -32,7 +31,6 @@ interface Incident {
   };
   createdAt: string;
   updatedAt: string;
-  distance?: number; // Add this field
 }
 
 const getSeverityColor = (severity: number) => {
@@ -57,8 +55,6 @@ export default function Monitor() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
   const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([]);
-  const { location: geoLocation, error: geoError } = useGeolocation(); // Add this line
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (debouncedSearchTerm) {
@@ -83,22 +79,9 @@ export default function Monitor() {
   };
 
   const fetchIncidents = async (latitude: number, longitude: number) => {
-    setLoading(true);
-    try {
-      const newIncidents = await getNearbyIncidents(
-        latitude, 
-        longitude, 
-        5000, // 5km radius
-        INCIDENTS_PER_PAGE, 
-        (page - 1) * INCIDENTS_PER_PAGE
-      );
-      setIncidents(prevIncidents => [...prevIncidents, ...newIncidents]);
-      setHasMore(newIncidents.length === INCIDENTS_PER_PAGE);
-    } catch (error) {
-      console.error('Error fetching incidents:', error);
-    } finally {
-      setLoading(false);
-    }
+    const newIncidents = await getNearbyIncidents(latitude, longitude, INCIDENTS_PER_PAGE, (page - 1) * INCIDENTS_PER_PAGE);
+    setIncidents(prevIncidents => [...prevIncidents, ...newIncidents]);
+    setHasMore(newIncidents.length === INCIDENTS_PER_PAGE);
   };
 
   useEffect(() => {
@@ -129,13 +112,22 @@ export default function Monitor() {
   }, []);
 
   useEffect(() => {
-    if (geoLocation && 'latitude' in geoLocation && 'longitude' in geoLocation) {
-      setLocation({
-        latitude: (geoLocation as GeolocationPosition['coords']).latitude,
-        longitude: (geoLocation as GeolocationPosition['coords']).longitude,
-      });
-    }
-  }, [geoLocation]);
+    const fetchLocation = async () => {
+      try {
+        const position: GeolocationPosition = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      } catch (error) {
+        console.error('Failed to fetch location', error);
+      }
+    };
+
+    fetchLocation();
+  }, []);
 
   const displayedIncidents = useMemo(() => {
     return filteredIncidents
@@ -167,7 +159,6 @@ export default function Monitor() {
         </div>
         <ApiKeyManagement />
       </div>
-      {geoError && <p className="text-red-500 mb-4">Error getting location: {geoError}</p>}
       <Dashboard />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
         {displayedIncidents.map((incident) => (
@@ -194,11 +185,6 @@ export default function Monitor() {
               <p className="text-sm text-gray-500">
                 Updated: {new Date(incident.updatedAt).toLocaleString()}
               </p>
-              {incident.distance && (
-                <p className="text-sm text-gray-500">
-                  Distance: {incident.distance.toFixed(2)} km
-                </p>
-              )}
               <Link href={`/incident/${incident._id}`} passHref>
                 <Button className="mt-2">View Details</Button>
               </Link>
@@ -210,7 +196,6 @@ export default function Monitor() {
         <Button onClick={loadMore} className="mt-4">Load More</Button>
       )}
       <Footer />
-      {loading && <p>Loading incidents...</p>}
     </div>
   );
 }

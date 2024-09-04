@@ -1,18 +1,20 @@
 console.log('Loading searchService.js');
 import { PineconeStore } from '@langchain/pinecone';
 import { OpenAI } from '@langchain/openai';
-import pinecone, { getIndex } from '../db/pinecone.js';  // Import pinecone and getIndex
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
-import { RetrievalQAChain } from "langchain/chains";
-import { ChatOpenAI } from "@langchain/openai";  // Updated import
+import { Pinecone } from '@pinecone-database/pinecone';
+//import IncidentReport from '../models/incidentReport.js';
 import { FuzzySearch } from 'fuzzy-search';
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
-const index = getIndex(process.env.PINECONE_INDEX);
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY,
+ // environment: process.env.PINECONE_ENVIRONMENT
+}); 
+const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
 const vectorStore = await PineconeStore.fromExistingIndex(
-  new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY_NEW }),
-  { pineconeIndex: index }
+  new OpenAI({ openAIApiKey: process.env.OPENAI_API_KEY }),
+  { pineconeIndex }
 );
 
 export async function performHybridSearch(query, k, filters = {}) {
@@ -37,9 +39,9 @@ export async function performHybridSearch(query, k, filters = {}) {
 }
 
 async function performSemanticSearch(query, k) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const embedding = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+    model: "text-embedding-ada-002",
     input: query,
   });
 
@@ -114,28 +116,10 @@ export async function deleteFromVectorStore(incidentId) {
 }
 
 async function generateEmbedding(text) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+    model: "text-embedding-ada-002",
     input: text,
   });
   return response.data[0].embedding;
-}
-
-export async function performNaturalLanguageSearch(query) {
-  const model = new ChatOpenAI({ modelName: "gpt-4" });  // Updated model name
-  const embeddings = new OpenAIEmbeddings();
-  const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
-
-  const vectorStore = await PineconeStore.fromExistingIndex(embeddings, { pineconeIndex });
-  const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
-
-  const response = await chain.call({
-    query: query,
-  });
-
-  return {
-    answer: response.text,
-    sourceDocuments: response.sourceDocuments
-  };
 }

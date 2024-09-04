@@ -1,17 +1,14 @@
 console.log('Loading graphDatabaseService.js');
 import neo4j from 'neo4j-driver';
-import { driver } from '../config/neo4jConfig.js';
-import logger from '../utils/logger.js';
 
-// const driver = neo4j.driver(
-//   'neo4j+s://231cc601.databases.neo4j.io',
-//   neo4j.auth.basic('neo4j', 'HpEZSBskq3gqsv6lpJNkQhQQAVa3vqMPR3FqM6i9rCk')
-// );
+const driver = neo4j.driver(
+  'neo4j+s://231cc601.databases.neo4j.io',
+  neo4j.auth.basic('neo4j', 'HpEZSBskq3gqsv6lpJNkQhQQAVa3vqMPR3FqM6i9rCk')
+);
 
 export async function createNewIncidentReportNeo4j(incidentData) {
   const session = driver.session();
   try {
-    console.log('Creating new incident report:', incidentData);
     const result = await session.run(
       `
       CREATE (i:IncidentReport {
@@ -30,10 +27,6 @@ export async function createNewIncidentReportNeo4j(incidentData) {
         placeOfImpact: $placeOfImpact,
         neighborhood: $neighborhood,
         keywords: $keywords,
-        reporterIP: $reporterIP,
-        ipLatitude: $ipLatitude,
-        ipLongitude: $ipLongitude,
-        needsReview: $needsReview,
         createdAt: datetime(),
         updatedAt: datetime()
       })
@@ -52,18 +45,10 @@ export async function createNewIncidentReportNeo4j(incidentData) {
         keywords: incidentData.metadata?.keywords || [],
         incidentName: incidentData.metadata?.incidentName,
         placeOfImpact: incidentData.metadata?.placeOfImpact || 'Unknown Location',
-        neighborhood: incidentData.metadata?.neighborhood,
-        reporterIP: incidentData.reporterIP,
-        ipLatitude: incidentData.ipLatitude,
-        ipLongitude: incidentData.ipLongitude,
-        needsReview: incidentData.needsReview
+        neighborhood: incidentData.metadata?.neighborhood
       }
     );
-    console.log('Incident report created successfully');
     return result.records[0].get('i').properties;
-  } catch (error) {
-    logger.error('Error creating incident report in Neo4j:', error);
-    throw error;
   } finally {
     await session.close();
   }
@@ -271,31 +256,6 @@ export async function getIncidentReportsNeo4j() {
       `
     );
     return result.records.map(record => record.get('i').properties);
-  } finally {
-    await session.close();
-  }
-}
-
-export async function getIncidentReportsNearLocation(latitude, longitude, radius) {
-  const session = driver.session();
-  try {
-    const result = await session.run(
-      `
-      MATCH (i:IncidentReport)
-      WHERE point.distance(point({latitude: i.latitude, longitude: i.longitude}), 
-                           point({latitude: $latitude, longitude: $longitude})) <= $radius
-      RETURN i,
-             point.distance(point({latitude: i.latitude, longitude: i.longitude}), 
-                            point({latitude: $latitude, longitude: $longitude})) AS distance
-      ORDER BY distance
-      LIMIT 50
-      `,
-      { latitude: parseFloat(latitude), longitude: parseFloat(longitude), radius: parseFloat(radius) }
-    );
-    return result.records.map(record => ({
-      ...record.get('i').properties,
-      distance: record.get('distance')
-    }));
   } finally {
     await session.close();
   }

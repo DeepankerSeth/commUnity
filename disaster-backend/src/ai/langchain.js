@@ -2,9 +2,11 @@ console.log('Loading langchain.js');
 import { OpenAI } from '@langchain/openai';
 import { PineconeStore } from '@langchain/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
+import { queryVectors } from '../db/pinecone';
+import { createNewIncidentReport } from './incidentService';
 import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let vectorStore;
 
@@ -29,54 +31,28 @@ Analyze this incident report and provide the following:
 3. Estimate the potential impact radius in miles.
 4. List any immediate risks or dangers associated with this incident.
 5. Suggest any immediate actions that should be taken by authorities or the public.
-
-Format your response as a JSON object with the following structure:
-{
-  "analysis": "string",
-  "severity": number,
-  "impactRadius": number,
-  "immediateRisks": ["string"],
-  "recommendedActions": ["string"]
-}
 `;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: 'You are a disaster response AI assistant.' },
       { role: 'user', content: prompt }
     ],
-    temperature: 0.7,
     max_tokens: 1000,
   });
 
-  const result = JSON.parse(response.choices[0].message.content);
-  console.log(result);
+  const analysis = response.choices[0].message.content;
+  
+  // Extract severity and impact radius using regex
+  const severityMatch = analysis.match(/Severity: (\d+)/);
+  const radiusMatch = analysis.match(/Impact Radius: (\d+(\.\d+)?)/);
+  
   return {
-    analysis: result.analysis,
-    severity: result.severity,
-    impactRadius: result.impactRadius,
-    immediateRisks: result.immediateRisks,
-    recommendedActions: result.recommendedActions
+    analysis,
+    severity: severityMatch ? parseInt(severityMatch[1]) : 5, // Default to 5 if not found
+    impactRadius: radiusMatch ? parseFloat(radiusMatch[1]) : 2 // Default to 2 mile if not found
   };
 };
 
-async function addIncidentToVectorStore(incident) {
-  const { _id, type, description, latitude, longitude } = incident;
-  const document = {
-    pageContent: `${type}: ${description}`,
-    metadata: {
-      id: _id.toString(),
-      type,
-      latitude,
-      longitude
-    }
-  };
-  await vectorStore.addDocuments([document]);
-}
-
-async function searchSimilarIncidents(query, k = 5) {
-  return await vectorStore.similaritySearch(query, k);
-}
-
-export { processIncident, addIncidentToVectorStore, searchSimilarIncidents };
+export { processIncident };

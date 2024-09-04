@@ -2,8 +2,7 @@ console.log('Loading monitorIncidents.js');
 // workers/monitorIncidents.js
 import dotenv from 'dotenv';
 import { PineconeStore } from '@langchain/pinecone';
-import pinecone from '../db/pinecone.js';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from 'mongoose';
 import { getIncidentReport } from '../services/incidentService.js';
 import { getIncidentUpdates, processIncident } from '../ai/llmProcessor.js';
@@ -26,14 +25,17 @@ dotenv.config();
 
 import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY,
+  //environment: "us-east-1-aws"
+});
+
+// mongoose.connect("mongodb://localhost:27017/commUnity", { useNewUrlParser: true, useUnifiedTopology: true });
+
 let vectorStore;
 
 async function setupVectorStore() {
-  const index = pinecone.Index(process.env.PINECONE_INDEX);
-  vectorStore = await PineconeStore.fromExistingIndex(
-    new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY_NEW }),
-    { pineconeIndex: index }
-  );
+  vectorStore = await initializeVectorStore();
 }
 
 setupVectorStore();

@@ -11,19 +11,17 @@ import { verifyIncident } from '../services/verificationService.js';
 import { performHybridSearch } from '../services/searchService.js';
 import path from 'path';
 import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
 
-const apiKey = process.env.OPENAI_API_KEY_NEW;
+const apiKey = process.env.OPENAI_API_KEY;
 console.log('Using OpenAI API Key:', apiKey.substring(0, 10) + '...');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY_NEW,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Initialize OpenAI embeddings
 const embeddings = new OpenAIEmbeddings({
-  openAIApiKey: process.env.OPENAI_API_KEY_NEW,
+  openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
 console.log('Embeddings object:', embeddings);
@@ -35,7 +33,7 @@ const pinecone = new Pinecone({
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
-console.log('OPENAI_API_KEY_NEW in llmProcessor working:', process.env.OPENAI_API_KEY_NEW);
+console.log('OPENAI_API_KEY in llmProcessor working:', process.env.OPENAI_API_KEY);
 console.log('PINECONE_API_KEY in llmProcessor working:', process.env.PINECONE_API_KEY);
 
 // Initialize PineconeStore with the correct embeddings object
@@ -65,48 +63,60 @@ export async function generateEmbedding(text) {
 /**
  * Processes an incident report using the LLM (e.g., GPT-4)
  * @param {Object} incident - The incident report to process
- * @returns {Promise<Object>} - The analysis provided by the LLM
+ * @returns {Promise<string>} - The analysis provided by the LLM
  */
 export async function processIncident(incident) {
-  const chat = new ChatOpenAI({ temperature: 0.7 });
-  const prompt = ChatPromptTemplate.fromTemplate(`
-    Analyze the following incident:
-    Type: {type}
-    Description: {description}
-    Location: Latitude {latitude}, Longitude {longitude}
-    Media URLs: {mediaUrls}
+  try {
+    const prompt = `Analyze the following incident:
+Type: ${incident.type || 'Not specified'}
+Description: ${incident.description}
+Media: ${incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'}
 
-    Provide the following information:
-    1. If the incident type is specified or not, determine the most appropriate type from this list if applicable or assign an appropriate type to the best of your ability: Fire, Flood, Earthquake, Hurricane, Tornado, Landslide, Tsunami, Volcanic Eruption, Wildfire, Blizzard, Drought, Heatwave, Chemical Spill, Nuclear Incident, Terrorist Attack, Civil Unrest, Pandemic, Infrastructure Failure, Transportation Accident, Other.
-    2. A concise and descriptive title for the incident (max 10 words).
-    3. A detailed analysis of the incident (max 200 words)
-    4. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic
-    5. Estimate the potential impact radius in miles
-    6. List any immediate risks or dangers associated with this incident (comma-separated)
-    7. Suggest immediate actions that should be taken by authorities or the public (comma-separated)
+Provide the following information:
+1. If the incident type is not specified, determine the most appropriate type from this list if applicable or assign an appropriate type to the best of your ability: Fire, Flood, Earthquake, Hurricane, Tornado, Landslide, Tsunami, Volcanic Eruption, Wildfire, Blizzard, Drought, Heatwave, Chemical Spill, Nuclear Incident, Terrorist Attack, Civil Unrest, Pandemic, Infrastructure Failure, Transportation Accident, Other.
+2. A concise and descriptive title for the incident (max 10 words).
+3. A detailed analysis of the incident.
+4. Assess the severity of the incident on a scale of 1-5, where 1 is minor and 5 is catastrophic.
+5. Estimate the potential impact radius in miles.
 
-    Format your response as a JSON object with the following structure:
-    {
-      "type": "string",
-      "title": "string",
-      "analysis": "string",
-      "severity": number,
-      "impactRadius": number,
-      "immediateRisks": ["string"],
-      "recommendedActions": ["string"]
+Format your response as a JSON object with the following structure, without any markdown formatting:
+{
+  "type": "string",
+  "title": "string",
+  "analysis": "string",
+  "severity": number,
+  "impactRadius": number
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
+      temperature:0.7,
+      max_tokens:1000,
+      top_p:1
+    });
+
+    const content = response.choices[0].message.content;
+    
+    // Remove any markdown formatting and extract the JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Failed to extract JSON from API response');
     }
-  `);
 
-  const chain = prompt.pipe(chat);
-  const response = await chain.invoke({
-    type: incident.type,
-    description: incident.description,
-    latitude: incident.latitude,
-    longitude: incident.longitude,
-    mediaUrls: incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'
-  });
+    const result = JSON.parse(jsonMatch[0]);
 
-  return JSON.parse(response.text);
+    return {
+      type: result.type,
+      title: result.title,
+      analysis: result.analysis,
+      severity: result.severity,
+      impactRadius: result.impactRadius
+    };
+  } catch (error) {
+    console.error('Error processing incident:', error);
+    throw error;
+  }
 }
 
 /**
@@ -117,7 +127,7 @@ export async function processIncident(incident) {
  */
 export async function updateIncident(incidentId, newReport) {
   // Fetch existing incident
-  const existingIncident = await getIncidentReportNeo4j(incidentId);
+  const existingIncident = await getIncidentReport(incidentId);
 
   if (!existingIncident) {
     throw new Error('Incident not found');
@@ -149,7 +159,7 @@ export async function updateIncident(incidentId, newReport) {
     metadata: analysis.metadata
   });
 
-  return updatedIncident;
+  return existingIncident;
 }
 
 // /**
@@ -222,7 +232,7 @@ export async function updateIncident(incidentId, newReport) {
  * @returns {Promise<string>} - The analysis provided by the LLM
  */
 export async function getIncidentUpdates(incidentId) {
-  const incident = await getIncidentReportNeo4j(incidentId);
+  const incident = await getIncidentReport(incidentId);
 
   if (!incident) {
     throw new Error('Incident not found');
@@ -258,9 +268,9 @@ export async function getIncidentUpdates(incidentId) {
   const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
-    temperature: 0.7,
-    max_tokens: 500,
-    top_p: 1
+    temperature:0.7,
+  max_tokens:64,
+  top_p:1
   });
   const content = response.choices[0].message.content;
   console.log(content);
@@ -273,7 +283,7 @@ export async function getIncidentUpdates(incidentId) {
  * @returns {Promise<Object[]>} - The incident timeline
  */
 export async function getIncidentTimeline(incidentId) {
-  const incident = await getIncidentReportNeo4j(incidentId);
+  const incident = await getIncidentReport(incidentId);
   if (!incident) {
     throw new Error('Incident not found');
   }
@@ -281,7 +291,7 @@ export async function getIncidentTimeline(incidentId) {
 }
 
 export async function updateMetadataWithFeedback(incidentId, userFeedback) {
-  const incident = await getIncidentReportNeo4j(incidentId);
+  const incident = await getIncidentReport(incidentId);
 
   if (!incident) {
     throw new Error('Incident not found');
@@ -304,9 +314,9 @@ export async function updateMetadataWithFeedback(incidentId, userFeedback) {
   const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
-    temperature: 0.7,
-    max_tokens: 200,
-    top_p: 1
+    temperature:0.7,
+  max_tokens:64,
+  top_p:1
   });
 
   const updatedMetadata = parseMetadataFromResponse(response.choices[0].message.content);

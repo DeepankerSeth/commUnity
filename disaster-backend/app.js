@@ -20,7 +20,6 @@ import { initializeSocketIO } from './src/services/socketService.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import logger from './src/utils/logger.js';
 
 const app = express();
 
@@ -41,6 +40,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 })); // Enables CORS for all routes
 
+
 // Rate limiting middleware
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -59,16 +59,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/location', userLocationRoutes);
 app.use('/api', searchRoutes); // Added route for search
-app.use('/api', apiForMobileRoutes); // This includes the new LangChain-powered routes
 
 // Global error handler
 app.use(errorHandler);
-
-// Error logging
-app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  next(err);
-});
 
 // Start the incident monitoring worker
 setInterval(monitorIncidents, 5 * 60 * 1000); // Run every 5 minutes
