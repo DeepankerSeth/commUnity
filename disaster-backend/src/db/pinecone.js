@@ -1,19 +1,33 @@
-console.log('Loading pinecone.js');
-import { PineconeClient } from 'pinecone-node';
+import { Pinecone } from '@pinecone-database/pinecone';
 
-const client = new PineconeClient(process.env.PINECONE_API_KEY);
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY,
+  //environment: process.env.PINECONE_ENVIRONMENT
+});
 
-const createIndex = async (indexName) => {
-  await client.createIndex(indexName);
+export default pinecone;
+
+// Utility functions
+export const getIndex = (indexName) => pinecone.Index(indexName);
+
+export const createIndex = async (indexName, dimension) => {
+  await pinecone.createIndex({
+    name: indexName,
+    dimension: dimension,
+    metric: 'cosine'
+  });
 };
 
-const upsertVectors = async (indexName, vectors) => {
-  await client.upsert(indexName, vectors);
+export const upsertVectors = async (indexName, vectors) => {
+  const index = getIndex(indexName);
+  await index.upsert(vectors);
 };
 
-const queryVectors = async (indexName, queryVector, topK) => {
-  const results = await client.query(indexName, queryVector, topK);
-  return results;
+export const queryVectors = async (indexName, queryVector, topK) => {
+  const index = getIndex(indexName);
+  return await index.query({
+    vector: queryVector,
+    topK: topK,
+    includeMetadata: true
+  });
 };
-
-export { createIndex, upsertVectors, queryVectors };

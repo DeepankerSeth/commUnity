@@ -1,20 +1,14 @@
 console.log('Loading vectorStoreInitializer.js');
 
 import { PineconeStore } from '@langchain/pinecone';
-import { Pinecone } from '@pinecone-database/pinecone';
-// import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import pinecone from '../db/pinecone.js';
 import { OpenAIEmbeddings } from '@langchain/openai';
-
-const pinecone = new Pinecone({
-  apiKey: "44acb654-e36a-4909-ad1b-3ffe62c3f62e",
-  //environment: "us-east-1-aws"
-});
 
 let vectorStore;
 
 export async function initializeVectorStore() {
   if (!vectorStore) {
-    const indexName = "community-incidents";
+    const indexName = process.env.PINECONE_INDEX;
     let index;
 
     try {
@@ -44,10 +38,36 @@ export async function initializeVectorStore() {
       }
     }
 
+    const embeddings = new OpenAIEmbeddings({ 
+      openAIApiKey: process.env.OPENAI_API_KEY_NEW,
+      modelName: "text-embedding-3-large"
+    });
+
     vectorStore = await PineconeStore.fromExistingIndex(
-      new OpenAIEmbeddings({ openAIApiKey: "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" }),
+      embeddings,
       { pineconeIndex: index }
     );
   }
   return vectorStore;
+}
+
+export async function addToVectorStore(document) {
+  const store = await initializeVectorStore();
+  await store.addDocuments([document]);
+}
+
+export async function searchVectorStore(query, k = 5) {
+  const store = await initializeVectorStore();
+  return await store.similaritySearch(query, k);
+}
+
+export async function deleteFromVectorStore(ids) {
+  const store = await initializeVectorStore();
+  await store.delete(ids);
+}
+
+export async function updateInVectorStore(id, document) {
+  const store = await initializeVectorStore();
+  await store.delete([id]);
+  await store.addDocuments([{ ...document, id }]);
 }

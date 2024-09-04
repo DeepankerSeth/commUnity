@@ -3,7 +3,6 @@ import { getIncidentUpdates, getIncidentTimeline } from '../ai/llmProcessor.js';
 import userLocation from './userLocation.js';
 import { getClusterData } from '../services/clusteringService.js';
 import { generateStatistics } from '../services/statisticsService.js';
-// import { addGeofence, removeGeofence, updateGeofence } from '../services/geofencingService.js';
 import { updateIncidentBasedOnFeedback } from '../services/incidentService.js';
 import { createIncident, provideFeedback } from '../db/controllers/incidentController.js';
 import { searchLocations, getLocationDetails } from '../services/locationService.js';
@@ -11,12 +10,14 @@ import { performHybridSearch } from '../services/searchService.js';
 import { getIncidentCluster, getIncidentsInArea, getFullIncidentTimeline, getIncidentPropagation } from '../services/advancedQueryService.js';
 import { processFeedback } from '../services/feedbackService.js';
 import multer from 'multer';
+import * as incidentController from '../controllers/incidentController.js';
 
 const router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+// Existing routes
 router.get('/incidents/:id/updates', async (req, res) => {
   try {
     const incidentId = req.params.id;
@@ -188,5 +189,18 @@ router.get('/incidents/:id/propagation', async (req, res) => {
     res.status(500).json({ error: 'Error fetching incident propagation' });
   }
 });
+
+// New routes for LangChain-powered features
+router.get('/trends', (req, res) => incidentController.getTrendAnalysis(req, res));
+router.get('/predictions', (req, res) => incidentController.getPredictions(req, res));
+router.get('/visualization', (req, res) => incidentController.getVisualizationData(req, res));
+router.get('/nlp-search', (req, res) => incidentController.searchIncidents(req, res));
+router.get('/response/:incidentType', (req, res) => incidentController.getAutomatedResponse(req, res));
+router.post('/analyze-media', (req, res) => incidentController.analyzeIncidentMedia(req, res));
+router.post('/evacuation-plan', (req, res) => incidentController.getEvacuationPlan(req, res));
+router.post('/verify-incident', (req, res) => incidentController.verifyIncident(req, res));
+router.post('/assess-risk', (req, res) => incidentController.assessRisk(req, res));
+
+router.get('/incidents/nearby', (req, res) => incidentController.getNearbyIncidents(req, res));
 
 export default router;

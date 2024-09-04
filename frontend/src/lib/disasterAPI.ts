@@ -61,12 +61,29 @@ export const updateUserLocation = async (locationData: any) => {
   return response.data;
 };
 
-export const getNearbyIncidents = async (latitude: number, longitude: number, maxDistance: number = 5000, offset: number = 0) => {
-  const response = await api.get('/incidents/nearby', {
-    params: { latitude, longitude, maxDistance, offset }
-  });
-  return response.data;
-};
+export async function getNearbyIncidents(
+  latitude: number, 
+  longitude: number, 
+  maxDistance: number = 5000, 
+  limit: number = 10, 
+  offset: number = 0
+) {
+  try {
+    const response = await api.get('/api/incidents/nearby', {
+      params: { 
+        latitude, 
+        longitude, 
+        maxDistance,
+        limit,
+        offset
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching nearby incidents:', error);
+    throw error;
+  }
+}
 
 export const fetchDisasterData = async () => {
   const response = await api.get('/predictions');

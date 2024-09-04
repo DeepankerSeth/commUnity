@@ -1,11 +1,15 @@
 console.log('Loading incidentController.js');
-import { processIncident, updateMetadataWithFeedback } from '../../ai/llmProcessor.js';
-import { checkSimilarIncidentsAndNotify } from '../../services/notificationService.js';
+import { processIncident, updateMetadataWithFeedback } from '../ai/llmProcessor.js';
+import { checkSimilarIncidentsAndNotify } from '../services/notificationService.js';
 import { Storage } from '@google-cloud/storage';
-import { emitIncidentUpdate, emitNewIncident } from '../../services/socketService.js';
-import { analyzeTrends, getPredictiveModel } from '../../services/trendAnalysisService.js';
-import { getHeatmapData, getTimeSeriesData } from '../../services/visualizationService.js';
+import { emitIncidentUpdate, emitNewIncident } from '../services/socketService.js';
+import { analyzeTrends, getPredictiveModel } from '../services/trendAnalysisService.js';
+import { getHeatmapData, getTimeSeriesData } from '../services/visualizationService.js';
+import { createNewIncidentReportNeo4j, getIncidentReportsNearLocation } from '../services/graphDatabaseService.js';
+import { getIPGeolocation, calculateDistance } from '../services/geolocationService.js';
 import { createNewIncidentReport } from '../services/incidentService.js';
+import logger from '../utils/logger.js';
+
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 
@@ -14,29 +18,50 @@ export const createIncident = async (req, res) => {
     console.log('Received incident data:', req.body);
     const { type, description, latitude, longitude } = req.body;
     const mediaFiles = req.files || [];
+    const userIP = req.ip;
 
-    let location;
-    if (latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude))) {
-      location = {
-        type: 'Point',
-        coordinates: [parseFloat(longitude), parseFloat(latitude)]
-      };
-    }
+    // Get user's IP-based location
+    const ipLocation = await getIPGeolocation(userIP);
 
     // Upload media files to Google Cloud Storage
-    const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
-      const blob = bucket.file(`${Date.now()}-${file.originalname}`);
-      const blobStream = blob.createWriteStream();
+    const mediaUrls = await Promise.all(mediaFiles.map
+      (async (file) => {
+        const blob = bucket.file(`${Date.now()}-${file.
+        originalname}`);
+        const blobStream = blob.createWriteStream();  
 
-      return new Promise((resolve, reject) => {
-        blobStream.on('error', (err) => reject(err));
-        blobStream.on('finish', () => resolve(blob.publicUrl()));
-        blobStream.end(file.buffer);
-      });
-    }));
+    // Calculate distance between reported location and IP-based location
+    const distance = calculateDistance(
+      latitude, 
+      longitude, 
+      ipLocation.latitude, 
+      ipLocation.longitude
+    );
 
-    const incidentData = { type, description, latitude, longitude, mediaUrls };
-    const incidentReport = await createNewIncidentReport(incidentData);
+    return new Promise((resolve, reject) => {
+      blobStream.on('error', (err) => reject(err));
+      blobStream.on('finish', () => resolve(blob.
+      publicUrl()));
+      blobStream.end(file.buffer);
+    });
+  }));
+
+    // If the distance is more than 5km, flag the report for review
+    const needsReview = distance > 5;
+
+    const incidentData = { 
+      type, 
+      description, 
+      latitude: parseFloat(latitude), 
+      longitude: parseFloat(longitude), 
+      reporterIP: userIP,
+      ipLatitude: ipLocation.latitude,
+      ipLongitude: ipLocation.longitude,
+      needsReview,
+      mediaUrls
+    };
+
+    const incidentReport = await createNewIncidentReportNeo4j(incidentData);
 
     // Process the incident
     const analysis = await processIncident(incidentReport);
@@ -47,6 +72,13 @@ export const createIncident = async (req, res) => {
     incidentReport.impactRadius = analysis.impactRadius;
     incidentReport.metadata = analysis.metadata;
 
+    await updateIncidentReport(incidentReport.id, {
+      analysis: analysis.analysis,
+      severity: analysis.severity,
+      impactRadius: analysis.impactRadius,
+      metadata: analysis.metadata
+    });
+
     // Emit new incident event
     emitNewIncident(incidentReport);
 
@@ -55,7 +87,8 @@ export const createIncident = async (req, res) => {
 
     res.status(201).json(incidentReport);
   } catch (error) {
-    console.error('Error creating incident:', error);
+    logger.error('Error creating incident:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'An error occurred while creating the incident' });
   }
 }
@@ -117,5 +150,16 @@ export const getVisualizationData = async (req, res) => {
   } catch (error) {
     console.error('Error fetching visualization data:', error);
     res.status(500).json({ error: 'An error occurred while fetching visualization data' });
+  }
+};
+
+export const getNearbyIncidents = async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 10000 } = req.query; // radius in meters, default 10km
+    const incidents = await getIncidentReportsNearLocation(latitude, longitude, radius);
+    res.json(incidents);
+  } catch (error) {
+    logger.error('Error fetching nearby incidents:', error);
+    res.status(500).json({ error: 'An error occurred while fetching nearby incidents' });
   }
 };
