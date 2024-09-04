@@ -7,14 +7,14 @@ import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import logger from './src/utils/logger.js';
+
 console.log('Loading server.js');
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
-
 // dotenv.config({ path: path.join(__dirname, '.env') });
 
-//console.log('__dirname:', __dirname);
-console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+console.log('OPENAI_API_KEY_NEW:', process.env.OPENAI_API_KEY_NEW);
 console.log('PINECONE_API_KEY:', process.env.PINECONE_API_KEY);
 
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -22,14 +22,14 @@ const MAX_PORT_ATTEMPTS = 10;
 
 async function startServer(attempt = 0) {
   if (attempt >= MAX_PORT_ATTEMPTS) {
-    console.error('Failed to find an available port after multiple attempts');
+    logger.error('Failed to find an available port after multiple attempts');
     process.exit(1);
   }
 
   const currentPort = PORT + attempt;
 
   if (currentPort >= 65536) {
-    console.error('Port number exceeded maximum allowed value');
+    logger.error('Port number exceeded maximum allowed value');
     process.exit(1);
   }
 
@@ -37,34 +37,33 @@ async function startServer(attempt = 0) {
   initializeSocketIO(server);
 
   try {
-    //await connectDB();
     const neo4jConnected = await initializeNeo4j();
     if (!neo4jConnected) {
-      console.error('Failed to connect to Neo4j. Exiting...');
+      logger.error('Failed to connect to Neo4j. Exiting...');
       process.exit(1);
     }
     await new Promise((resolve, reject) => {
       server.listen(currentPort, () => {
-        console.log(`Server started on port ${currentPort}`);
+        logger.info(`Server started on port ${currentPort}`);
         resolve();
       }).on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-          console.log(`Port ${currentPort} is busy, trying the next one...`);
+          logger.warn(`Port ${currentPort} is busy, trying the next one...`);
           reject(err);
         } else {
-          console.error('Error starting server:', err);
+          logger.error('Error starting server:', err);
           reject(err);
         }
       });
     });
     
     // Start the incident monitoring worker
-    monitorIncidents().catch(error => console.error('Error in monitorIncidents:', error));
+    monitorIncidents().catch(error => logger.error('Error in monitorIncidents:', error));
   } catch (err) {
     if (err.code === 'EADDRINUSE') {
       startServer(attempt + 1);
     } else {
-      console.error('Error starting server:', err);
+      logger.error('Error starting server:', err);
       process.exit(1);
     }
   }

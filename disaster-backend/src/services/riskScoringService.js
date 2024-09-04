@@ -2,6 +2,8 @@
 console.log('Loading riskScoringService.js');
 import { getDistance } from 'geolib';
 import { getFeedbackStats } from './feedbackService.js';
+import { ChatOpenAI } from "@langchain/openai";
+import { PromptTemplate } from "@langchain/core/prompts";
 
 const SEVERITY_WEIGHT = 0.5;
 const DISTANCE_WEIGHT = 0.3;
@@ -112,4 +114,33 @@ export async function updateRiskScoring(incidentId, accuracy) {
     // Emit updated risk score to the user
     emitRiskUpdate(user._id, { incidentId: incident._id, riskScore });
   }
+}
+
+export async function assessRiskDynamically(currentIncident, historicalIncidents, realTimeData) {
+  const model = new ChatOpenAI();
+  const template = `
+  Current incident: {currentIncident}
+  Historical data: {historicalData}
+  Real-time factors: {realTimeFactors}
+
+  Assess the risk level of the current incident. Provide a risk score from 1 to 10 and explain your assessment.
+  Format your response as a JSON object with the following structure:
+  {
+    "riskScore": number,
+    "explanation": "string",
+    "keyFactors": ["string"],
+    "potentialEscalationScenarios": ["string"],
+    "recommendedPrecautions": ["string"]
+  }
+  `;
+  const prompt = new PromptTemplate({ template, inputVariables: ["currentIncident", "historicalData", "realTimeFactors"] });
+
+  const chain = prompt.pipe(model);
+  const response = await chain.invoke({
+    currentIncident: JSON.stringify(currentIncident),
+    historicalData: JSON.stringify(historicalIncidents),
+    realTimeFactors: JSON.stringify(realTimeData)
+  });
+
+  return JSON.parse(response.text);
 }

@@ -3,6 +3,9 @@ console.log('Loading verificationService.js');
 import axios from 'axios';
 import { emitVerificationUpdate } from './socketService.js';
 // import { getUsersFromAuth0 } from '../services/auth0Service.js';
+import { ChatOpenAI } from "@langchain/openai";
+import { PromptTemplate } from "@langchain/core/prompts";
+//import { SerpAPI } from "@langchain/community";
 
 const OFFICIAL_SOURCE_API = process.env.OFFICIAL_SOURCE_API;
 
@@ -107,4 +110,33 @@ function calculateVerificationScore(userVerification, officialVerification, aiVe
     officialVerification * weights.official +
     aiVerification * weights.ai
   );
+}
+
+export async function verifyIncidentAutomatically(incidentReport) {
+  const model = new ChatOpenAI();
+  // const searchTool = new SerpAPI(process.env.SERPAPI_API_KEY);
+
+  const template = `
+  Incident report: {incidentReport}
+  Search results: {searchResults}
+
+  Based on the search results, verify the accuracy of the incident report. Provide a verification score from 0 to 1 and explain your reasoning.
+  Format your response as a JSON object with the following structure:
+  {
+    "verificationScore": number,
+    "explanation": "string",
+    "confirmedDetails": ["string"],
+    "questionableDetails": ["string"]
+  }
+  `;
+  const prompt = new PromptTemplate({ template, inputVariables: ["incidentReport", "searchResults"] });
+
+  const chain = prompt.pipe(model);
+  const searchResults = await searchTool.call(`Recent ${incidentReport.type} in ${incidentReport.location}`);
+  const response = await chain.invoke({ 
+    incidentReport: JSON.stringify(incidentReport), 
+    searchResults: JSON.stringify(searchResults)
+  });
+
+  return JSON.parse(response.text);
 }
