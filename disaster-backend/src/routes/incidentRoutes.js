@@ -7,7 +7,9 @@ import { checkSimilarIncidentsAndNotify } from '../services/notificationService.
 import { createIncident } from '../db/controllers/incidentController.js';
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 router.post('/', upload.array('mediaFiles', 5), createIncident);
 

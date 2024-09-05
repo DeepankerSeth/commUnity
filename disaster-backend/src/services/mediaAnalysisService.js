@@ -13,7 +13,7 @@ import { PromptTemplate } from "@langchain/core/prompts";
 const visionClient = new vision.ImageAnnotatorClient();
 const videoIntelligenceClient = new VideoIntelligenceServiceClient();
 const storage = new Storage();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 

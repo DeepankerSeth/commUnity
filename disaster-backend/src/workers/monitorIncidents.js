@@ -31,7 +31,7 @@ let vectorStore;
 async function setupVectorStore() {
   const index = pinecone.Index(process.env.PINECONE_INDEX);
   vectorStore = await PineconeStore.fromExistingIndex(
-    new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY_NEW }),
+    new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY }),
     { pineconeIndex: index }
   );
 }

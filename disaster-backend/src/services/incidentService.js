@@ -2,12 +2,10 @@ import { processIncident } from '../ai/llmProcessor.js';
 import { createNewIncidentReportNeo4j, getIncidentReportsNeo4j, updateIncidentReport } from './graphDatabaseService.js';
 
 export async function createNewIncidentReport(incidentData) {
-
-  //Implementation here
-  
   console.log('Received incident data:', incidentData);
   const analysis = await processIncident(incidentData);
-  return createNewIncidentReportNeo4j({ ...incidentData, ...analysis });
+  const combinedData = { ...incidentData, ...analysis };
+  return createNewIncidentReportNeo4j(combinedData);
 }
 
 export async function getIncidentReport(id) {

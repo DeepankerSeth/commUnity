@@ -1,29 +1,23 @@
 console.log('Loading llmProcessor.js');
-import OpenAI from 'openai';
+import { OpenAI } from "@langchain/openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { PineconeStore } from '@langchain/pinecone';
-import { Pinecone } from '@pinecone-database/pinecone';
-import { getIncidentReportNeo4j } from '../services/graphDatabaseService.js';
-import { uploadFile } from '../services/storageService.js';
-import { emitIncidentUpdate } from '../services/socketService.js';
-import { performClustering, getClusterData } from '../services/clusteringService.js';
-import { verifyIncident } from '../services/verificationService.js';
-import { performHybridSearch } from '../services/searchService.js';
-import path from 'path';
-import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-
-const apiKey = process.env.OPENAI_API_KEY_NEW;
-console.log('Using OpenAI API Key:', apiKey.substring(0, 10) + '...');
+import { PineconeStore } from '@langchain/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { getIncidentReportNeo4j, updateIncidentReport, getRelatedIncidents } from '../services/graphDatabaseService.js';
+import { updateVectorStore } from '../services/searchService.js';
+import { emitIncidentUpdate } from '../services/socketService.js';
+import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
+import { performHybridSearch } from '../services/searchService.js';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY_NEW,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Initialize OpenAI embeddings
 const embeddings = new OpenAIEmbeddings({
-  openAIApiKey: process.env.OPENAI_API_KEY_NEW,
+  openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
 console.log('Embeddings object:', embeddings);
@@ -35,11 +29,15 @@ const pinecone = new Pinecone({
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
-console.log('OPENAI_API_KEY_NEW in llmProcessor working:', process.env.OPENAI_API_KEY_NEW);
+console.log('OPENAI_API_KEY in llmProcessor working:', process.env.OPENAI_API_KEY);
 console.log('PINECONE_API_KEY in llmProcessor working:', process.env.PINECONE_API_KEY);
 
 // Initialize PineconeStore with the correct embeddings object
-const vectorStore = await initializeVectorStore();
+let vectorStore;
+
+(async () => {
+  vectorStore = await initializeVectorStore();
+})();
 
 /**
  * Generates an embedding using OpenAI
@@ -62,61 +60,94 @@ export async function generateEmbedding(text) {
   }
 }
 
-/**
- * Processes an incident report using the LLM (e.g., GPT-4)
- * @param {Object} incident - The incident report to process
- * @returns {Promise<Object>} - The analysis provided by the LLM
- */
-export async function processIncident(incident) {
-  const chat = new ChatOpenAI({ temperature: 0.7 });
-  const prompt = ChatPromptTemplate.fromTemplate(`
-    Analyze the following incident:
-    Type: {type}
-    Description: {description}
-    Location: Latitude {latitude}, Longitude {longitude}
-    Media URLs: {mediaUrls}
+async function processIncident(incident) {
+  try {
+    const chat = new ChatOpenAI({ temperature: 0.7 });
+    const prompt = ChatPromptTemplate.fromTemplate(`
+      Analyze the following incident:
+      Type: {type}
+      Description: {description}
+      Location: Latitude {latitude}, Longitude {longitude}
+      Media URLs: {mediaUrls}
 
-    Provide the following information:
-    1. If the incident type is specified or not, determine the most appropriate type from this list if applicable or assign an appropriate type to the best of your ability: Fire, Flood, Earthquake, Hurricane, Tornado, Landslide, Tsunami, Volcanic Eruption, Wildfire, Blizzard, Drought, Heatwave, Chemical Spill, Nuclear Incident, Terrorist Attack, Civil Unrest, Pandemic, Infrastructure Failure, Transportation Accident, Other.
-    2. A concise and descriptive title for the incident (max 10 words).
-    3. A detailed analysis of the incident (max 200 words)
-    4. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic
-    5. Estimate the potential impact radius in miles
-    6. List any immediate risks or dangers associated with this incident (comma-separated)
-    7. Suggest immediate actions that should be taken by authorities or the public (comma-separated)
+      Provide the following information:
+      1. If the incident type is specified or not, determine the most appropriate type from this list if applicable or assign an appropriate type to the best of your ability: Fire, Flood, Earthquake, Hurricane, Tornado, Landslide, Tsunami, Volcanic Eruption, Wildfire, Blizzard, Drought, Heatwave, Chemical Spill, Nuclear Incident, Terrorist Attack, Civil Unrest, Pandemic, Infrastructure Failure, Transportation Accident, Other.
+      2. A concise and descriptive title for the incident (max 10 words).
+      3. A detailed analysis of the incident (max 200 words)
+      4. Assess the severity of the incident on a scale of 1-10, where 1 is minor and 10 is catastrophic
+      5. Estimate the potential impact radius in miles
+      6. List any immediate risks or dangers associated with this incident (comma-separated)
+      7. Suggest immediate actions that should be taken by authorities or the public (comma-separated)
+      8. Identify keywords related to this incident (comma-separated)
+      9. Suggest a name for the incident (e.g., "2023 California Wildfire")
+      10. Identify the specific place of impact (e.g., "123 Main St, Downtown Los Angeles")
+      11. Identify the broader neighborhood or region affected (e.g., "Downtown Los Angeles")
 
-    Format your response as a JSON object with the following structure:
-    {
-      "type": "string",
-      "title": "string",
-      "analysis": "string",
-      "severity": number,
-      "impactRadius": number,
-      "immediateRisks": ["string"],
-      "recommendedActions": ["string"]
+      Format your response as a JSON object with the following structure:
+      {{
+        "type": "string",
+        "title": "string",
+        "analysis": "string",
+        "severity": number,
+        "impactRadius": number,
+        "immediateRisks": ["string"],
+        "recommendedActions": ["string"],
+        "keywords": ["string"],
+        "incidentName": "string",
+        "placeOfImpact": "string",
+        "neighborhood": "string"
+      }}
+    `);
+
+    const chain = prompt.pipe(chat);
+    const response = await chain.invoke({
+      type: incident.type || "Unknown",
+      description: incident.description || "No description provided",
+      latitude: incident.latitude || incident.location?.coordinates?.[1] || "Unknown",
+      longitude: incident.longitude || incident.location?.coordinates?.[0] || "Unknown",
+      mediaUrls: incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'
+    });
+
+    console.log("LLM Response:", response);
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(response.content);
+    } catch (parseError) {
+      console.error("Error parsing LLM response:", parseError);
+      parsedResponse = {};
     }
-  `);
+    
+    // Ensure all required fields are present
+    const defaultResponse = {
+      type: "Unknown",
+      title: "Untitled Incident",
+      analysis: "No analysis provided",
+      severity: 1,
+      impactRadius: 0,
+      immediateRisks: [],
+      recommendedActions: [],
+      keywords: [],
+      incidentName: "Unnamed Incident",
+      placeOfImpact: "Unknown",
+      neighborhood: "Unknown"
+    };
 
-  const chain = prompt.pipe(chat);
-  const response = await chain.invoke({
-    type: incident.type,
-    description: incident.description,
-    latitude: incident.latitude,
-    longitude: incident.longitude,
-    mediaUrls: incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'
-  });
+    // Validate the result
+    if (!parsedResponse.type || !parsedResponse.title || !parsedResponse.analysis || 
+        parsedResponse.severity === undefined || parsedResponse.impactRadius === undefined || 
+        !parsedResponse.immediateRisks || !parsedResponse.recommendedActions) {
+      throw new Error("Incomplete response from AI");
+    }
 
-  return JSON.parse(response.text);
+    return { ...defaultResponse, ...parsedResponse };
+  } catch (error) {
+    console.error("Error processing incident with LangChain:", error);
+    throw error;
+  }
 }
 
-/**
- * Updates an incident report with new information
- * @param {string} incidentId - The ID of the incident to update
- * @param {Object} newReport - The new report containing additional information
- * @returns {Promise<Object>} - The updated incident
- */
-export async function updateIncident(incidentId, newReport) {
-  // Fetch existing incident
+async function updateIncident(incidentId, newReport) {
   const existingIncident = await getIncidentReportNeo4j(incidentId);
 
   if (!existingIncident) {
@@ -128,123 +159,55 @@ export async function updateIncident(incidentId, newReport) {
   
   const analysis = await processIncident(updatedIncident);
 
-  // Update incident in Neo4j
-  await updateIncidentReport(incidentId, {
+  const updatedData = {
     description: combinedDescription,
     analysis: analysis.analysis,
     severity: analysis.severity,
     impactRadius: analysis.impactRadius,
-    metadata: analysis.metadata
-  });
+    metadata: {
+      immediateRisks: analysis.immediateRisks,
+      recommendedActions: analysis.recommendedActions,
+      keywords: analysis.keywords,
+      incidentName: analysis.incidentName,
+      placeOfImpact: analysis.placeOfImpact,
+      neighborhood: analysis.neighborhood
+    }
+  };
 
-  // Get related incidents from Neo4j
+  await updateIncidentReport(incidentId, updatedData);
+  await updateVectorStore({ ...updatedIncident, ...updatedData });
+
   const relatedIncidents = await getRelatedIncidents(incidentId);
 
-  // Emit incident update to connected clients
-  emitIncidentUpdate(incidentId, {
-    description: combinedDescription,
-    analysis: analysis.analysis,
-    severity: analysis.severity,
-    impactRadius: analysis.impactRadius,
-    metadata: analysis.metadata
-  });
+  emitIncidentUpdate(incidentId, updatedData);
 
-  return updatedIncident;
+  return { ...updatedIncident, ...updatedData };
 }
 
-// /**
-//  * Creates a new incident report and stores it in Neo4j and Pinecone
-//  * @param {Object} incidentData - The incident data to store
-//  * @returns {Promise<Object>} - The created incident report
-//  */
-// export async function createNewIncidentReport(incidentData) {
-//   console.log('Received incident data:', incidentData);
-//   const { type, description, location, mediaUrls } = incidentData;
-
-//   // Validate required fields
-//   if (!type || !description) {
-//     throw new Error('Type and description are required fields');
-//   }
-
-//   // Process the incident with LLM
-//   const analysis = await processIncident({ type, description, location, mediaUrls });
-
-//   const incidentReport = {
-//     type,
-//     description,
-//     location,
-//     mediaUrls,
-//     analysis: analysis.analysis,
-//     severity: analysis.severity,
-//     impactRadius: analysis.impactRadius,
-//     metadata: {
-//       ...analysis.metadata,
-//       keywords: analysis.metadata?.keywords || [],
-//       incidentName: analysis.metadata?.incidentName || 'Unnamed Incident',
-//       placeOfImpact: analysis.placeOfImpact || 'Unknown Location'
-//     },
-//     timeline: [{ update: 'Incident created', timestamp: new Date() }]
-//   };
-
-//   // Create vector embedding and store in Pinecone
-//   const embeddingText = `${type} ${description}`;
-//   const embedding = await generateEmbedding(embeddingText);
-//   if (embedding && embedding.length > 0) {
-//     try {
-//       await initializeVectorStore();
-//       await vectorStore.addDocuments([
-//         {
-//           pageContent: embeddingText,
-//           metadata: { 
-//             type,
-//             description, 
-//             latitude: location?.coordinates[1], 
-//             longitude: location?.coordinates[0]
-//           }
-//         }
-//       ]);
-//     } catch (error) {
-//       console.error('Error adding document to vector store:', error);
-//     }
-//   } else {
-//     console.error('Failed to generate embedding');
-//   }
-
-//   // Store in Neo4j
-//   const createdIncident = await createNewIncidentReport(incidentReport);
-
-//   return createdIncident;
-// }
-
-/**
- * Retrieves and processes similar incidents
- * @param {string} incidentId - The ID of the incident to update
- * @returns {Promise<string>} - The analysis provided by the LLM
- */
-export async function getIncidentUpdates(incidentId) {
+async function getIncidentUpdates(incidentId) {
   const incident = await getIncidentReportNeo4j(incidentId);
 
   if (!incident) {
     throw new Error('Incident not found');
   }
 
-  // Perform hybrid search
   const similarIncidents = await performHybridSearch(
     `${incident.type} ${incident.description}`,
     5,
     { reportId: { $ne: incidentId } }
   );
 
-  // Get related incidents from Neo4j
   const relatedIncidents = await getRelatedIncidents(incidentId);
 
-  // Process with LLM
   const prompt = `
     Analyze the following incident, similar incidents, and related incidents to provide a comprehensive update:
 
     Main Incident:
     Type: ${incident.type}
     Description: ${incident.description}
+    Incident Name: ${incident.metadata.incidentName}
+    Place of Impact: ${incident.metadata.placeOfImpact}
+    Neighborhood: ${incident.metadata.neighborhood}
 
     Similar Incidents:
     ${similarIncidents.map(inc => `- ${inc.pageContent}`).join('\n')}
@@ -253,26 +216,16 @@ export async function getIncidentUpdates(incidentId) {
     ${relatedIncidents.map(inc => `- ${inc.incident.type}: ${inc.incident.description}`).join('\n')}
 
     Provide a detailed update on the situation, including any patterns, potential risks, and recommended actions.
+    Also, suggest any changes to the severity, impact radius, or metadata based on this new information.
   `;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4",
-    messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
-    temperature: 0.7,
-    max_tokens: 500,
-    top_p: 1
-  });
-  const content = response.choices[0].message.content;
-  console.log(content);
-  return content;
+  const chat = new ChatOpenAI({ temperature: 0.7 });
+  const response = await chat.invoke(prompt);
+
+  return response.content;
 }
 
-/**
- * Fetches the incident timeline
- * @param {string} incidentId - The ID of the incident
- * @returns {Promise<Object[]>} - The incident timeline
- */
-export async function getIncidentTimeline(incidentId) {
+async function getIncidentTimeline(incidentId) {
   const incident = await getIncidentReportNeo4j(incidentId);
   if (!incident) {
     throw new Error('Incident not found');
@@ -280,7 +233,7 @@ export async function getIncidentTimeline(incidentId) {
   return incident.timeline;
 }
 
-export async function updateMetadataWithFeedback(incidentId, userFeedback) {
+async function updateMetadataWithFeedback(incidentId, userFeedback) {
   const incident = await getIncidentReportNeo4j(incidentId);
 
   if (!incident) {
@@ -302,7 +255,7 @@ export async function updateMetadataWithFeedback(incidentId, userFeedback) {
   `;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-4o",
     messages: [{ role: "system", content: "You are a disaster response AI assistant." }, { role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: 200,
@@ -341,3 +294,12 @@ async function analyzeMedia(url, mediaType) {
   // For now, we'll return a placeholder analysis
   return `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} analysis: Content appears to be related to the incident.`;
 }
+
+export {
+  processIncident,
+  updateIncident,
+  getIncidentUpdates,
+  getIncidentTimeline,
+  updateMetadataWithFeedback,
+  analyzeMedia
+};

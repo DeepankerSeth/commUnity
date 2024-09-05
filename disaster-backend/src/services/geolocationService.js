@@ -17,6 +17,22 @@ export async function getIPGeolocation(ip) {
   }
 }
 
+export async function handleIPLocationRequest(req, res) {
+  try {
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    logger.info(`Requesting IP location for: ${ip}`);
+    const location = await getIPGeolocation(ip);
+    logger.info('IP location result:', location);
+    res.json({
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+  } catch (error) {
+    logger.error('Error handling IP location request:', error);
+    res.status(500).json({ error: 'Failed to get location: ' + error.message });
+  }
+}
+
 export function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);

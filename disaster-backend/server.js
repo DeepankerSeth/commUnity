@@ -10,11 +10,8 @@ import path from 'path';
 import logger from './src/utils/logger.js';
 
 console.log('Loading server.js');
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-// dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log('OPENAI_API_KEY_NEW:', process.env.OPENAI_API_KEY_NEW);
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
 console.log('PINECONE_API_KEY:', process.env.PINECONE_API_KEY);
 
 const PORT = parseInt(process.env.PORT) || 3001;

@@ -1,6 +1,7 @@
 console.log('Loading userLocation.js');
 import express from 'express';
 import axios from 'axios';
+import { handleIPLocationRequest } from '../services/geolocationService.js';
 
 const router = express.Router();
 
@@ -29,5 +30,8 @@ router.get('/location', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Add the IP-based location route
+router.get('/ip-location', handleIPLocationRequest);
 
 export default router;

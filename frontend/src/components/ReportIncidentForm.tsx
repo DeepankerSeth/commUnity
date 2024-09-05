@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,17 @@ export default function ReportIncidentForm() {
   const [files, setFiles] = useState<FileList | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { latitude, longitude, error: locationError, loading: locationLoading } = useGeolocation();
+  const { latitude, longitude, error: locationError, loading: locationLoading, source: locationSource } = useGeolocation();
+
+  useEffect(() => {
+    if (locationError) {
+      toast({
+        title: "Location Error",
+        description: locationError,
+        variant: "destructive",
+      });
+    }
+  }, [locationError, toast]);
 
   const incidentTypes = [
     "Fire", "Flood", "Earthquake", "Hurricane", "Tornado", "Landslide", "Tsunami",
@@ -26,7 +36,7 @@ export default function ReportIncidentForm() {
     e.preventDefault();
     if (isSubmitting) return;
 
-    if (latitude === null || longitude === null) {
+    if (!latitude || !longitude) {
       toast({
         title: "Location Error",
         description: "Unable to get your current location. Please enable location services and try again.",
@@ -50,6 +60,7 @@ export default function ReportIncidentForm() {
     formData.append('description', description);
     formData.append('latitude', latitude.toString());
     formData.append('longitude', longitude.toString());
+    formData.append('locationSource', locationSource || 'unknown');
     if (files) {
       for (let i = 0; i < files.length; i++) {
         formData.append('mediaFiles', files[i]);
@@ -125,12 +136,12 @@ export default function ReportIncidentForm() {
         </div>
         {locationLoading && <p>Getting your location...</p>}
         {locationError && <p className="text-red-500">Error: {locationError}</p>}
-        {(latitude === null || longitude === null) && !locationLoading && !locationError && (
-          <div className="text-sm text-yellow-600">
-            Location data is not available. Your report will be submitted without location information.
-          </div>
+        {latitude && longitude && (
+          <p className="text-green-500">
+            Location acquired {locationSource === 'ip' ? '(based on IP address)' : ''}
+          </p>
         )}
-        <Button type="submit" disabled={isSubmitting || (latitude === null && longitude === null) || locationLoading}>
+        <Button type="submit" disabled={isSubmitting || !latitude || !longitude || locationLoading}>
           {isSubmitting ? 'Submitting...' : 'Submit Report'}
         </Button>
       </form>

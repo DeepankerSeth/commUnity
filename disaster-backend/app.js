@@ -36,7 +36,7 @@ app.use(express.json());
 // Security middleware
 app.use(helmet()); // Protects against well-known vulnerabilities
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 })); // Enables CORS for all routes

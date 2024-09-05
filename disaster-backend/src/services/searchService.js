@@ -10,10 +10,12 @@ import { FuzzySearch } from 'fuzzy-search';
 
 const index = getIndex(process.env.PINECONE_INDEX);
 
-const vectorStore = await PineconeStore.fromExistingIndex(
-  new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY_NEW }),
-  { pineconeIndex: index }
-);
+let vectorStore;
+
+// Call the initialization function
+initializeVectorStore().then(vs => {
+  vectorStore = vs;
+}).catch(console.error);
 
 export async function performHybridSearch(query, k, filters = {}) {
   // Vector similarity search
@@ -37,7 +39,7 @@ export async function performHybridSearch(query, k, filters = {}) {
 }
 
 async function performSemanticSearch(query, k) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const embedding = await openai.embeddings.create({
     model: "text-embedding-3-large",
     input: query,
@@ -114,7 +116,7 @@ export async function deleteFromVectorStore(incidentId) {
 }
 
 async function generateEmbedding(text) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_NEW });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.embeddings.create({
     model: "text-embedding-3-large",
     input: text,
