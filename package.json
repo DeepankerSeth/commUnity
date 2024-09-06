@@ -20,6 +20,7 @@
     "dev:frontend": "cd frontend && npm run dev",
     "dev:disaster-backend": "cd disaster-backend && npm run dev",
     "dev:donation-backend": "cd donation-backend && npm run dev",
+    "setup": "npm install && npm run install:all && npm run build",
     "test": "npm run test:frontend && npm run test:disaster-backend && npm run test:donation-backend",
     "test:frontend": "cd frontend && npm test",
     "test:disaster-backend": "cd disaster-backend && npm test",

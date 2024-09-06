@@ -2,6 +2,7 @@
 */.env.local
 
 # Node modules
+node_modules
 */node_modules/
 
 # Logs
@@ -24,3 +25,4 @@
 
 # Local environment settings
 */.vscode/
+node_modules

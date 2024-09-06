@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { getTrendAnalysis, getPredictions, getVisualizationData } from '@/lib/disasterAPI';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

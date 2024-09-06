@@ -75,15 +75,7 @@ export default function Homepage() {
               <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">Monitor</span>
             </Button>
           </Link>
-          <Link href="/evacuation" passHref>
-            <Button
-              variant="outline"
-              className="flex flex-col items-center justify-center h-32 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full"
-            >
-              <Users className="w-8 h-8 text-green-600 dark:text-green-400 mb-2" />
-              <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">Evacuation</span>
-            </Button>
-          </Link>
+          
           <Link href="/donate" passHref>
             <Button
               variant="outline"

@@ -1,13 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*', // Adjust the port if necessary
-      },
-    ]
+  reactStrictMode: true,
+  swcMinify: true,
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.svg$/,
+      use: ["@svgr/webpack"]
+    });
+    return config;
   },
-};
+  // Add any other necessary configurations
+}
 
-export default nextConfig;
+module.exports = nextConfig

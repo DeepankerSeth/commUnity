@@ -46,11 +46,6 @@ export const getIncidentUpdates = async (incidentId: string) => {
   return response.data;
 };
 
-export const getEvacuationInstructions = async (start: string, end: string) => {
-  const response = await api.post('/evacuation', { start, end });
-  return response.data;
-};
-
 export const updateAlertPreferences = async (userId: string, preferences: any) => {
   const response = await api.post('/alert-preferences', { userId, preferences });
   return response.data;

@@ -18,6 +18,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-toast": "^1.2.1",
     "@react-google-maps/api": "^2.19.3",
+    "@svgr/webpack": "^8.1.0",
     "@types/recharts": "^1.8.29",
     "@types/zxcvbn": "^4.4.4",
     "class-variance-authority": "^0.7.0",
