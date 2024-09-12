@@ -17,8 +17,8 @@ export interface Fundraiser {
 }
 
 export interface DonateLinkRequest {
-  identifier: string;
-  amount?: number;
+  nonprofitId: string;
+  amount: number; // Remove the optional '?'
   suggestedAmounts?: number[];
   min_value?: number;
   frequency?: 'ONCE' | 'MONTHLY' | 'YEARLY';

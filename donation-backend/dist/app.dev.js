@@ -1,59 +1,72 @@
 "use strict";
 
-var express = require('express');
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports["default"] = void 0;
 
-var bodyParser = require('body-parser');
+var _express = _interopRequireDefault(require("express"));
 
-var charityRoutes = require('./src/routes/charityRoutes');
+var _bodyParser = _interopRequireDefault(require("body-parser"));
 
-var xss = require('xss-clean');
+var _charityRoutes = _interopRequireDefault(require("./src/routes/charityRoutes.js"));
 
-var helmet = require('helmet');
+var _xssClean = _interopRequireDefault(require("xss-clean"));
 
-var morgan = require('morgan');
+var _helmet = _interopRequireDefault(require("helmet"));
 
-var cors = require('cors');
+var _morgan = _interopRequireDefault(require("morgan"));
 
-var rateLimit = require('express-rate-limit');
+var _cors = _interopRequireDefault(require("cors"));
 
-var requestId = require('./src/middleware/requestId');
+var _expressRateLimit = _interopRequireDefault(require("express-rate-limit"));
 
-var swaggerUi = require('swagger-ui-express');
+var _requestId = _interopRequireDefault(require("./src/middleware/requestId.js"));
 
-var YAML = require('yamljs');
+var _swaggerUiExpress = _interopRequireDefault(require("swagger-ui-express"));
 
-require('dotenv').config();
+var _yamljs = _interopRequireDefault(require("yamljs"));
 
-var app = express();
-var port = process.env.PORT || 0;
-app.use(helmet());
-app.use(xss());
-app.use(bodyParser.json());
-app.use(morgan('combined'));
-app.use(cors());
-var limiter = rateLimit({
+var _logger = _interopRequireDefault(require("./src/utils/logger.js"));
+
+var _dotenv = _interopRequireDefault(require("dotenv"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
+
+_dotenv["default"].config();
+
+var app = (0, _express["default"])();
+var port = process.env.PORT || 3000; // Default to 3000 if PORT is not set
+
+app.use((0, _helmet["default"])());
+app.use((0, _xssClean["default"])());
+app.use(_bodyParser["default"].json());
+app.use((0, _morgan["default"])('combined'));
+app.use((0, _cors["default"])());
+var limiter = (0, _expressRateLimit["default"])({
   windowMs: 15 * 60 * 1000,
   // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 
 });
 app.use(limiter);
-app.use(requestId);
-app.use('/api/charities', charityRoutes);
-var swaggerDocument = YAML.load('./src/swagger.yaml');
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use(_requestId["default"]);
+app.use('/api/charities', _charityRoutes["default"]);
 
-var logger = require('./src/utils/logger'); // Error handling middleware
+var swaggerDocument = _yamljs["default"].load('./src/swagger.yaml');
 
+app.use('/api-docs', _swaggerUiExpress["default"].serve, _swaggerUiExpress["default"].setup(swaggerDocument)); // Global error handler
 
 app.use(function (err, req, res, next) {
-  logger.error(err.stack);
+  _logger["default"].error('Unhandled error:', err);
+
   res.status(500).json({
-    error: 'Something went wrong!'
+    error: 'An unexpected error occurred'
   });
 });
 var server = app.listen(port, function () {
   var actualPort = server.address().port;
-  console.log("Server is running on port ".concat(actualPort));
+  console.log("Donation backend server is running on port ".concat(actualPort));
 });
-module.exports = app;
+var _default = app;
+exports["default"] = _default;

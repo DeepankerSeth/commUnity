@@ -1,33 +1,46 @@
 "use strict";
 
-var axios = require('axios');
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
-var _require = require('express-validator'),
-    validationResult = _require.validationResult;
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.generateDonateLink = exports.createFundraiser = exports.getNonprofitDetails = exports.searchNonprofits = void 0;
+
+var _axios = _interopRequireDefault(require("axios"));
+
+var _expressValidator = require("express-validator");
+
+var everyorgService = _interopRequireWildcard(require("../services/everyorgService.js"));
+
+var _logger = _interopRequireDefault(require("../utils/logger.js"));
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function _getRequireWildcardCache() { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { "default": obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj["default"] = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
 var EVERY_ORG_BASE_URL = 'https://partners.every.org/v0.2';
-var PRIVATE_KEY = process.env.EVERY_ORG_PRIVATE_KEY;
-var everyorgClient = axios.create({
+var EVERY_ORG_PRIVATE_API_KEY = process.env.EVERY_ORG_PRIVATE_API_KEY;
+
+var everyorgClient = _axios["default"].create({
   baseURL: EVERY_ORG_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': "Bearer ".concat(PRIVATE_KEY)
+    'Authorization': "Bearer ".concat(EVERY_ORG_PRIVATE_API_KEY)
   }
 });
 
-var everyorgService = require('../services/everyorgService');
+var searchNonprofits = function searchNonprofits(req, res, next) {
+  var errors, searchTerm, _req$query, take, causes, data;
 
-var logger = require('../utils/logger');
-
-exports.searchNonprofits = function _callee(req, res, next) {
-  var errors, searchTerm, _req$query, take, causes, apiKey, data;
-
-  return regeneratorRuntime.async(function _callee$(_context) {
+  return regeneratorRuntime.async(function searchNonprofits$(_context) {
     while (1) {
       switch (_context.prev = _context.next) {
         case 0:
           _context.prev = 0;
-          errors = validationResult(req);
+          errors = (0, _expressValidator.validationResult)(req);
 
           if (errors.isEmpty()) {
             _context.next = 4;
@@ -41,41 +54,46 @@ exports.searchNonprofits = function _callee(req, res, next) {
         case 4:
           searchTerm = req.params.searchTerm;
           _req$query = req.query, take = _req$query.take, causes = _req$query.causes;
-          apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
-          _context.next = 9;
-          return regeneratorRuntime.awrap(everyorgService.searchNonprofits(searchTerm, apiKey, take, causes));
+          _context.next = 8;
+          return regeneratorRuntime.awrap(everyorgService.searchNonprofits(searchTerm, EVERY_ORG_PRIVATE_API_KEY, take, causes));
 
-        case 9:
+        case 8:
           data = _context.sent;
-          logger.info("Successfully searched nonprofits with term: ".concat(searchTerm));
+
+          _logger["default"].info("Successfully searched nonprofits with term: ".concat(searchTerm));
+
           res.json(data);
-          _context.next = 18;
+          _context.next = 17;
           break;
 
-        case 14:
-          _context.prev = 14;
+        case 13:
+          _context.prev = 13;
           _context.t0 = _context["catch"](0);
-          logger.error("Error in searchNonprofits: ".concat(_context.t0.message), {
+
+          _logger["default"].error("Error in searchNonprofits: ".concat(_context.t0.message), {
             error: _context.t0
           });
+
           next(_context.t0);
 
-        case 18:
+        case 17:
         case "end":
           return _context.stop();
       }
     }
-  }, null, null, [[0, 14]]);
+  }, null, null, [[0, 13]]);
 };
 
-exports.getNonprofitDetails = function _callee2(req, res, next) {
-  var errors, identifier, apiKey, data;
-  return regeneratorRuntime.async(function _callee2$(_context2) {
+exports.searchNonprofits = searchNonprofits;
+
+var getNonprofitDetails = function getNonprofitDetails(req, res, next) {
+  var errors, identifier, data;
+  return regeneratorRuntime.async(function getNonprofitDetails$(_context2) {
     while (1) {
       switch (_context2.prev = _context2.next) {
         case 0:
           _context2.prev = 0;
-          errors = validationResult(req);
+          errors = (0, _expressValidator.validationResult)(req);
 
           if (errors.isEmpty()) {
             _context2.next = 4;
@@ -88,41 +106,46 @@ exports.getNonprofitDetails = function _callee2(req, res, next) {
 
         case 4:
           identifier = req.params.identifier;
-          apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
-          _context2.next = 8;
-          return regeneratorRuntime.awrap(everyorgService.getNonprofitDetails(identifier, apiKey));
+          _context2.next = 7;
+          return regeneratorRuntime.awrap(everyorgService.getNonprofitDetails(identifier, EVERY_ORG_PRIVATE_API_KEY));
 
-        case 8:
+        case 7:
           data = _context2.sent;
-          logger.info("Successfully retrieved nonprofit details for identifier: ".concat(identifier));
+
+          _logger["default"].info("Successfully retrieved nonprofit details for identifier: ".concat(identifier));
+
           res.json(data);
-          _context2.next = 17;
+          _context2.next = 16;
           break;
 
-        case 13:
-          _context2.prev = 13;
+        case 12:
+          _context2.prev = 12;
           _context2.t0 = _context2["catch"](0);
-          logger.error("Error in getNonprofitDetails: ".concat(_context2.t0.message), {
+
+          _logger["default"].error("Error in getNonprofitDetails: ".concat(_context2.t0.message), {
             error: _context2.t0
           });
+
           next(_context2.t0);
 
-        case 17:
+        case 16:
         case "end":
           return _context2.stop();
       }
     }
-  }, null, null, [[0, 13]]);
+  }, null, null, [[0, 12]]);
 };
 
-exports.createFundraiser = function _callee3(req, res, next) {
-  var errors, fundraiserData, apiKey, data;
-  return regeneratorRuntime.async(function _callee3$(_context3) {
+exports.getNonprofitDetails = getNonprofitDetails;
+
+var createFundraiser = function createFundraiser(req, res, next) {
+  var errors, fundraiserData, data;
+  return regeneratorRuntime.async(function createFundraiser$(_context3) {
     while (1) {
       switch (_context3.prev = _context3.next) {
         case 0:
           _context3.prev = 0;
-          errors = validationResult(req);
+          errors = (0, _expressValidator.validationResult)(req);
 
           if (errors.isEmpty()) {
             _context3.next = 4;
@@ -135,36 +158,41 @@ exports.createFundraiser = function _callee3(req, res, next) {
 
         case 4:
           fundraiserData = req.body;
-          apiKey = process.env.EVERY_ORG_PRIVATE_KEY;
-          _context3.next = 8;
-          return regeneratorRuntime.awrap(everyorgService.createFundraiser(fundraiserData, apiKey));
+          _context3.next = 7;
+          return regeneratorRuntime.awrap(everyorgService.createFundraiser(fundraiserData, EVERY_ORG_PRIVATE_API_KEY));
 
-        case 8:
+        case 7:
           data = _context3.sent;
-          logger.info("Successfully created fundraiser for nonprofit ID: ".concat(fundraiserData.nonprofitId));
+
+          _logger["default"].info("Successfully created fundraiser for nonprofit ID: ".concat(fundraiserData.nonprofitId));
+
           res.json(data);
-          _context3.next = 17;
+          _context3.next = 16;
           break;
 
-        case 13:
-          _context3.prev = 13;
+        case 12:
+          _context3.prev = 12;
           _context3.t0 = _context3["catch"](0);
-          logger.error("Error in createFundraiser: ".concat(_context3.t0.message), {
+
+          _logger["default"].error("Error in createFundraiser: ".concat(_context3.t0.message), {
             error: _context3.t0
           });
+
           next(_context3.t0);
 
-        case 17:
+        case 16:
         case "end":
           return _context3.stop();
       }
     }
-  }, null, null, [[0, 13]]);
+  }, null, null, [[0, 12]]);
 };
 
-exports.generateDonateLink = function (req, res) {
+exports.createFundraiser = createFundraiser;
+
+var generateDonateLink = function generateDonateLink(req, res) {
   try {
-    var errors = validationResult(req);
+    var errors = (0, _expressValidator.validationResult)(req);
 
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -217,16 +245,20 @@ exports.generateDonateLink = function (req, res) {
       donateLink += "?".concat(params.toString());
     }
 
-    logger.info("Donate link generated for identifier: ".concat(identifier));
+    _logger["default"].info("Donate link generated for identifier: ".concat(identifier));
+
     res.json({
       donateLink: donateLink
     });
   } catch (error) {
-    logger.error("Error in generateDonateLink: ".concat(error.message), {
+    _logger["default"].error("Error in generateDonateLink: ".concat(error.message), {
       error: error
     });
+
     res.status(500).json({
       error: 'An error occurred while generating the donate link'
     });
   }
 };
+
+exports.generateDonateLink = generateDonateLink;

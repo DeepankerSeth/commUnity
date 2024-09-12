@@ -14,15 +14,15 @@ import { performHybridSearch } from '../services/searchService.js';
 import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 import { updateVectorStore } from '../services/searchService.js';
 
-const apiKey = process.env.OPENAI_API_KEY;
+const apiKey = process.env.UPDATED_OPEN_AI_API_KEY;
 console.log('Using OpenAI API Key:', apiKey.substring(0, 10) + '...');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.UPDATED_OPEN_AI_API_KEY,
 });
 
 const embeddings = new OpenAIEmbeddings({
-  openAIApiKey: process.env.OPENAI_API_KEY,
+  openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
 });
 
 const pinecone = new Pinecone({

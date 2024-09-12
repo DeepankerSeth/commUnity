@@ -8,7 +8,7 @@ export default function Page() {
   return (
     <Layout>
       <Header />
-        <Homepage />
+      <Homepage />
     </Layout>
   );
 }

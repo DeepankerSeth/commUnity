@@ -1,22 +1,22 @@
-const axios = require('axios');
+import axios from 'axios';
 
 const EVERY_ORG_BASE_URL = 'https://partners.every.org/v0.2';
 
-exports.searchNonprofits = async (searchTerm, apiKey, take = 50, causes = '') => {
+export const searchNonprofits = async (searchTerm, apiKey, take = 50, causes = '') => {
   const response = await axios.get(`${EVERY_ORG_BASE_URL}/search/${searchTerm}`, {
     params: { apiKey, take, causes }
   });
   return response.data;
 };
 
-exports.getNonprofitDetails = async (identifier, apiKey) => {
+export const getNonprofitDetails = async (identifier, apiKey) => {
   const response = await axios.get(`${EVERY_ORG_BASE_URL}/nonprofit/${identifier}`, {
     params: { apiKey }
   });
   return response.data;
 };
 
-exports.createFundraiser = async (fundraiserData, apiKey) => {
+export const createFundraiser = async (fundraiserData, apiKey) => {
   const response = await axios.post(`${EVERY_ORG_BASE_URL}/fundraiser`, fundraiserData, {
     headers: {
       'Content-Type': 'application/json',

@@ -2,14 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  webpack(config) {
+  webpack: (config) => {
     config.module.rules.push({
       test: /\.svg$/,
       use: ["@svgr/webpack"]
     });
     return config;
   },
-  // Add any other necessary configurations
-}
+  // Remove any references to 'dist' here if they exist
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

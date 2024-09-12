@@ -254,7 +254,7 @@ const CompassIcon = (props: React.SVGProps<SVGSVGElement>) => (
 </svg>
 );
 
-const icon = ({ type, ...props }: { type?: string } & React.SVGProps<SVGSVGElement>) => {
+const DisasterIcon = ({ type, ...props }: { type?: string } & React.SVGProps<SVGSVGElement>) => {
   if (!type) return null;
   switch (type.toLowerCase()) {
     case 'tornado':
@@ -326,5 +326,4 @@ const icon = ({ type, ...props }: { type?: string } & React.SVGProps<SVGSVGEleme
       return null;
   }
 };
-
-export default icon;
+export default DisasterIcon;

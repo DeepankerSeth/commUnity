@@ -4,7 +4,6 @@ import userLocation from './userLocation.js';
 import { getClusterData } from '../services/clusteringService.js';
 import { generateStatistics } from '../services/statisticsService.js';
 import { updateIncidentBasedOnFeedback } from '../services/incidentService.js';
-import { createIncident, provideFeedback } from '../db/controllers/incidentController.js';
 import { searchLocations, getLocationDetails } from '../services/locationService.js';
 import { performHybridSearch } from '../services/searchService.js';
 import { getIncidentCluster, getIncidentsInArea, getFullIncidentTimeline, getIncidentPropagation } from '../services/advancedQueryService.js';

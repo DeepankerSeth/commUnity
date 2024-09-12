@@ -1,18 +1,21 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const charityRoutes = require('./src/routes/charityRoutes');
-const xss = require('xss-clean');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
-const requestId = require('./src/middleware/requestId');
-const swaggerUi = require('swagger-ui-express');
-const YAML = require('yamljs');
-require('dotenv').config();
+import express from 'express';
+import bodyParser from 'body-parser';
+import charityRoutes from './src/routes/charityRoutes.js';
+import xss from 'xss-clean';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import requestId from './src/middleware/requestId.js';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import logger from './src/utils/logger.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 0;
+const port = process.env.PORT || 3000;  // Default to 3000 if PORT is not set
 
 app.use(helmet());
 app.use(xss());
@@ -33,17 +36,15 @@ app.use('/api/charities', charityRoutes);
 const swaggerDocument = YAML.load('./src/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-const logger = require('./src/utils/logger');
-
-// Error handling middleware
+// Global error handler
 app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'An unexpected error occurred' });
 });
 
 const server = app.listen(port, () => {
   const actualPort = server.address().port;
-  console.log(`Server is running on port ${actualPort}`);
+  console.log(`Donation backend server is running on port ${actualPort}`);
 });
 
-module.exports = app;
+export default app;

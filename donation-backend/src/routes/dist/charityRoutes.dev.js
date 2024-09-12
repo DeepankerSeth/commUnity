@@ -1,22 +1,34 @@
 "use strict";
 
-var express = require('express');
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
-var _require = require('express-validator'),
-    check = _require.check;
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports["default"] = void 0;
 
-var charityController = require('../controllers/charityController');
+var _express = _interopRequireDefault(require("express"));
 
-var validate = require('../middleware/validate');
+var _expressValidator = require("express-validator");
 
-var authenticateUser = require('../middleware/auth');
+var charityController = _interopRequireWildcard(require("../controllers/charityController.js"));
 
-var router = express.Router();
-router.get('/search/:searchTerm', [check('searchTerm').not().isEmpty().withMessage('Search term is required'), check('take').optional().isInt({
+var _validate = _interopRequireDefault(require("../middleware/validate.js"));
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function _getRequireWildcardCache() { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { "default": obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj["default"] = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
+
+var router = _express["default"].Router();
+
+router.get('/search/:searchTerm', [(0, _expressValidator.check)('searchTerm').not().isEmpty().withMessage('Search term is required'), (0, _expressValidator.check)('take').optional().isInt({
   min: 1,
   max: 50
-}).withMessage('Take must be between 1 and 50'), check('causes').optional().isString().withMessage('Causes must be a string'), validate], charityController.searchNonprofits);
-router.get('/details/:nonprofitId', [check('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), validate], charityController.getNonprofitDetails);
-router.post('/fundraiser', [check('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), check('title').not().isEmpty().withMessage('Title is required'), check('description').not().isEmpty().withMessage('Description is required'), validate], charityController.createFundraiser);
-router.post('/donate-link', [check('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), validate], charityController.generateDonateLink);
-module.exports = router;
+}).withMessage('Take must be between 1 and 50'), (0, _expressValidator.check)('causes').optional().isString().withMessage('Causes must be a string'), _validate["default"]], charityController.searchNonprofits);
+router.get('/details/:nonprofitId', [(0, _expressValidator.check)('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), _validate["default"]], charityController.getNonprofitDetails);
+router.post('/fundraiser', [(0, _expressValidator.check)('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), (0, _expressValidator.check)('title').not().isEmpty().withMessage('Title is required'), (0, _expressValidator.check)('description').not().isEmpty().withMessage('Description is required'), _validate["default"]], charityController.createFundraiser);
+router.post('/donate-link', [(0, _expressValidator.check)('nonprofitId').not().isEmpty().withMessage('Nonprofit ID is required'), _validate["default"]], charityController.generateDonateLink);
+var _default = router;
+exports["default"] = _default;

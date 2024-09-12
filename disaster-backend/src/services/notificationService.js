@@ -1,43 +1,56 @@
 console.log('Loading notificationService.js');
+
 import Notification from '../models/notification.js';
-//import IncidentReport from '../models/incidentReport.js';
+import { getDriver } from '../config/neo4jConfig.js';
 import { calculateRiskScore } from './riskScoringService.js';
 import { emitNotification } from './socketService.js';
+import logger from '../utils/logger.js';
+
 
 export async function checkSimilarIncidentsAndNotify(newIncident) {
-  const similarIncidents = await IncidentReport.find({
-    type: newIncident.type,
-    location: {
-      $near: {
-        $geometry: {
-          type: "Point",
-          coordinates: [newIncident.longitude, newIncident.latitude]
-        },
-        $maxDistance: 1000 // 1km radius
+  const session = getDriver().session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (i:IncidentReport)
+      WHERE i.type = $type
+      AND point.distance(point({longitude: i.longitude, latitude: i.latitude}), 
+                         point({longitude: $longitude, latitude: $latitude})) <= 1000
+      AND i.id <> $id
+      AND i.createdAt >= datetime($twentyFourHoursAgo)
+      RETURN i
+      `,
+      {
+        type: newIncident.type,
+        longitude: newIncident.longitude,
+        latitude: newIncident.latitude,
+        id: newIncident.id,
+        twentyFourHoursAgo: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       }
-    },
-    _id: { $ne: newIncident._id },
-    createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
-  });
+    );
 
-  if (similarIncidents.length >= 1) {
-    const nearbyUsers = await getUsersFromAuth0({
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [newIncident.longitude, newIncident.latitude]
-          },
-          $maxDistance: newIncident.impactRadius * 1609.34 // Convert miles to meters
-        }
+    const similarIncidents = result.records.map(record => record.get('i').properties);
+
+    if (similarIncidents.length >= 1) {
+      const nearbyUsers = await getNearbyUsers(newIncident);
+
+      for (const user of nearbyUsers) {
+        const notification = generateNotification(newIncident, user.location);
+        await sendNotification(user, notification);
       }
-    });
-
-    for (const user of nearbyUsers) {
-      const notification = generateNotification(newIncident, user.location);
-      await sendNotification(user, notification);
     }
+  } catch (error) {
+    logger.error('Error checking similar incidents:', error);
+  } finally {
+    await session.close();
   }
+}
+
+async function getNearbyUsers(incident) {
+  // This is a placeholder. Implement the actual logic to get nearby users.
+  // You might need to query your user database or use a geospatial index.
+  logger.info('Getting nearby users for incident:', incident.id);
+  return []; // Return an empty array for now
 }
 
 export function generateNotification(incident, userLocation) {
@@ -62,19 +75,44 @@ export function generateNotification(incident, userLocation) {
     urgency,
     message: `${urgency}: ${incident.type} reported near your location. ${action}.`,
     riskScore,
-    incidentId: incident._id
+    incidentId: incident.id
   };
 }
 
 export async function sendNotification(user, notification) {
-  const newNotification = new Notification({
-    userId: user._id,
-    ...notification
-  });
-  await newNotification.save();
-  
-  emitNotification(user._id.toString(), notification);
-  
-  // Implement actual notification sending logic here (e.g., push notifications, SMS, email)
-  console.log(`Sending ${notification.urgency} notification to user ${user._id}:`, notification.message);
+  try {
+    const session = getDriver().session();
+    await session.run(
+      `
+      CREATE (n:Notification {
+        id: randomUUID(),
+        userId: $userId,
+        urgency: $urgency,
+        message: $message,
+        riskScore: $riskScore,
+        incidentId: $incidentId,
+        createdAt: datetime()
+      })
+      RETURN n
+      `,
+      {
+        userId: user.id,
+        ...notification
+      }
+    );
+    
+    emitNotification(user.id, notification);
+    
+    logger.info(`Sending ${notification.urgency} notification to user ${user.id}:`, notification.message);
+  } catch (error) {
+    logger.error('Error sending notification:', error);
+  } finally {
+    session.close();
+  }
 }
+
+export default {
+  checkSimilarIncidentsAndNotify,
+  generateNotification,
+  sendNotification
+};

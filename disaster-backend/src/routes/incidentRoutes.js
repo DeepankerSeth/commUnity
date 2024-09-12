@@ -4,7 +4,7 @@ import multer from 'multer';
 import { uploadFile } from '../storage/googleCloudStorage.js';
 import { createNewIncidentReport } from '../services/incidentService.js';
 import { checkSimilarIncidentsAndNotify } from '../services/notificationService.js';
-import { createIncident } from '../db/controllers/incidentController.js';
+import { createIncident } from '../controllers/incidentController.js';
 
 const router = express.Router();
 

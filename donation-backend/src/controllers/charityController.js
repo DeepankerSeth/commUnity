@@ -1,21 +1,21 @@
-const axios = require('axios');
-const { validationResult } = require('express-validator');
+import axios from 'axios';
+import { validationResult } from 'express-validator';
 
 const EVERY_ORG_BASE_URL = 'https://partners.every.org/v0.2';
-const PRIVATE_KEY = process.env.EVERY_ORG_PRIVATE_KEY;
+const EVERY_ORG_PRIVATE_API_KEY = process.env.EVERY_ORG_PRIVATE_API_KEY;
 
 const everyorgClient = axios.create({
   baseURL: EVERY_ORG_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${PRIVATE_KEY}`
+    'Authorization': `Bearer ${EVERY_ORG_PRIVATE_API_KEY}`
   },
 });
 
-const everyorgService = require('../services/everyorgService');
-const logger = require('../utils/logger');
+import * as everyorgService from '../services/everyorgService.js';
+import logger from '../utils/logger.js';
 
-exports.searchNonprofits = async (req, res, next) => {
+const searchNonprofits = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -24,8 +24,7 @@ exports.searchNonprofits = async (req, res, next) => {
 
     const { searchTerm } = req.params;
     const { take, causes } = req.query;
-    const apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
-    const data = await everyorgService.searchNonprofits(searchTerm, apiKey, take, causes);
+    const data = await everyorgService.searchNonprofits(searchTerm, EVERY_ORG_PRIVATE_API_KEY, take, causes);
     logger.info(`Successfully searched nonprofits with term: ${searchTerm}`);
     res.json(data);
   } catch (error) {
@@ -34,7 +33,7 @@ exports.searchNonprofits = async (req, res, next) => {
   }
 };
 
-exports.getNonprofitDetails = async (req, res, next) => {
+const getNonprofitDetails = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -42,8 +41,7 @@ exports.getNonprofitDetails = async (req, res, next) => {
     }
 
     const { identifier } = req.params;
-    const apiKey = process.env.EVERY_ORG_PUBLIC_API_KEY;
-    const data = await everyorgService.getNonprofitDetails(identifier, apiKey);
+    const data = await everyorgService.getNonprofitDetails(identifier, EVERY_ORG_PRIVATE_API_KEY);
     logger.info(`Successfully retrieved nonprofit details for identifier: ${identifier}`);
     res.json(data);
   } catch (error) {
@@ -52,7 +50,7 @@ exports.getNonprofitDetails = async (req, res, next) => {
   }
 };
 
-exports.createFundraiser = async (req, res, next) => {
+const createFundraiser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -60,8 +58,7 @@ exports.createFundraiser = async (req, res, next) => {
     }
 
     const fundraiserData = req.body;
-    const apiKey = process.env.EVERY_ORG_PRIVATE_KEY;
-    const data = await everyorgService.createFundraiser(fundraiserData, apiKey);
+    const data = await everyorgService.createFundraiser(fundraiserData, EVERY_ORG_PRIVATE_API_KEY);
     logger.info(`Successfully created fundraiser for nonprofit ID: ${fundraiserData.nonprofitId}`);
     res.json(data);
   } catch (error) {
@@ -70,7 +67,7 @@ exports.createFundraiser = async (req, res, next) => {
   }
 };
 
-exports.generateDonateLink = (req, res) => {
+const generateDonateLink = (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -133,3 +130,5 @@ exports.generateDonateLink = (req, res) => {
         res.status(500).json({ error: 'An error occurred while generating the donate link' });
     }
 };
+
+export { searchNonprofits, getNonprofitDetails, createFundraiser, generateDonateLink };

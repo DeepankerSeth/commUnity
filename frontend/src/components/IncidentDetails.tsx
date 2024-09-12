@@ -38,7 +38,7 @@ const IncidentDetails: React.FC<IncidentDetailsProps> = ({ incidentId }) => {
               <DisasterIcon type={incident.type} className="inline-block mr-2 w-6 h-6" />
               {incident.type} Incident
             </CardTitle>
-            <Badge variant={incident.status === 'active' ? 'solid' : 'outline'}>
+            <Badge variant={incident.status === 'active' ? 'default' : 'outline'}>
               {incident.status}
             </Badge>
           </div>

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import DisasterIcon from "@/components/ui/icons";
 import { initializeSocket } from '@/lib/socket';
+import Image from 'next/image';
 
 interface Incident {
   _id: string;
@@ -84,7 +85,7 @@ const IncidentClient: React.FC = () => {
               <DisasterIcon type={incident.type} className="inline-block mr-2 w-6 h-6" />
               {incident.type} Incident
             </CardTitle>
-            <Badge variant={incident.status === 'active' ? 'solid' : 'outline'}>
+            <Badge variant={incident.status === 'active' ? 'default' : 'outline'}>
               {incident.status}
             </Badge>
           </div>
@@ -110,7 +111,14 @@ const IncidentClient: React.FC = () => {
               <h3 className="text-lg font-semibold mb-2">Media</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {incident.mediaUrls.map((url, index) => (
-                  <img key={index} src={url} alt={`Incident media ${index + 1}`} className="w-full h-48 object-cover rounded-lg" />
+                  <Image 
+                    key={index} 
+                    src={url} 
+                    alt={`Incident media ${index + 1}`} 
+                    width={500} 
+                    height={300} 
+                    layout="responsive" 
+                  />
                 ))}
               </div>
             </div>

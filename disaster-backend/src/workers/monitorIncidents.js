@@ -21,6 +21,7 @@ import {
   getRelatedIncidents
 } from '../services/graphDatabaseService.js';
 import { generateStatistics } from '../services/statisticsService.js';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -31,7 +32,7 @@ let vectorStore;
 async function setupVectorStore() {
   const index = pinecone.Index(process.env.PINECONE_INDEX);
   vectorStore = await PineconeStore.fromExistingIndex(
-    new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY }),
+    new OpenAIEmbeddings({ openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY }),
     { pineconeIndex: index }
   );
 }
@@ -40,94 +41,91 @@ setupVectorStore();
 
 let isMonitoring = false;
 
-async function monitorIncidents() {
-  await setupVectorStore();
-
-  if (isMonitoring) return;
-  isMonitoring = true;
-
+export async function monitorIncidents() {
   try {
+    await setupVectorStore();
+
+    if (isMonitoring) return;
+    isMonitoring = true;
+
+    logger.info('Starting monitorIncidents function');
+
     const recentIncidents = await getIncidentReport({
       createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes
     });
 
+    logger.info(`Found ${recentIncidents ? recentIncidents.length : 0 } recent incidents`);
+    if (recentIncidents == undefined) {
+      logger.info('No recent incidents found, skipping processing');
+      return;
+    }
     for (const incident of recentIncidents) {
-      const analysis = await processIncident(incident);
-      incident.analysis = analysis.analysis;
-      incident.severity = analysis.severity;
-      incident.impactRadius = analysis.impactRadius;
+      try {
+        logger.info(`Processing incident ${incident._id}`);
+        const analysis = await processIncident(incident);
+        incident.analysis = analysis.analysis;
+        incident.severity = analysis.severity;
+        incident.impactRadius = analysis.impactRadius;
 
-      // Update incident timeline
-      incident.timeline.push({
-        update: 'Incident reprocessed',
-        severity: incident.severity,
-        impactRadius: incident.impactRadius,
-        timestamp: new Date()
-      });
+        // Update incident timeline
+        incident.timeline.push({
+          update: 'Incident reprocessed',
+          severity: incident.severity,
+          impactRadius: incident.impactRadius,
+          timestamp: new Date()
+        });
 
-      await incident.save();
+        await incident.save();
+        logger.info(`Saved updated incident ${incident._id}`);
 
-      // Update Neo4j
-      await createIncidentNode(incident);
-      await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
-      await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
+        // Update Neo4j if connected
+        try {
+          await createIncidentNode(incident);
+          await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
+          await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
+          logger.info(`Updated Neo4j for incident ${incident._id}`);
+        } catch (neoError) {
+          logger.warn(`Failed to update Neo4j for incident ${incident._id}:`, neoError);
+        }
 
-      // Get related incidents from Neo4j
-      const relatedIncidents = await getRelatedIncidents(incident._id.toString());
+        // Get related incidents from Neo4j
+        const relatedIncidents = await getRelatedIncidents(incident._id.toString());
 
-      // Notify nearby users
-     // await notifyNearbyUsers(incident);
+        await incident.save();
 
-      // Check geofences and notify users
-     // await checkGeofencesAndNotify(incident);
-
-      // Verify incident
-      // const verificationResult = await verifyIncident(incident._id);
-      // incident.verificationScore = verificationResult.verificationScore;
-      // incident.verificationStatus = verificationResult.verificationStatus;
-      await incident.save();
-
-      // Emit updated incident data to all connected clients
-      emitIncidentUpdate(incident._id, incident);
-      // emitVerificationUpdate(incident._id, verificationResult.verificationScore, verificationResult.verificationStatus);
+        // Emit updated incident data to all connected clients
+        emitIncidentUpdate(incident._id, incident);
+        logger.info(`Emitted update for incident ${incident._id}`);
+      } catch (error) {
+        logger.error(`Error processing incident ${incident._id}:`, error);
+      }
     }
 
     // Perform clustering
-    const clusterData = await getClusterData();
-    emitClusterUpdate(clusterData);
+    try {
+      logger.info('Performing clustering');
+      const clusterData = await getClusterData();
+      emitClusterUpdate(clusterData);
+      logger.info('Clustering completed and emitted');
+    } catch (error) {
+      logger.error('Error performing clustering:', error);
+    }
 
     // Generate and cache statistics
     try {
+      logger.info('Generating statistics');
       await generateStatistics();
+      logger.info('Statistics generated');
     } catch (error) {
-      console.error('Error generating statistics:', error);
+      logger.error('Error generating statistics:', error);
     }
   } catch (error) {
-    console.error('Error in monitorIncidents:', error);
+    logger.error('Error in monitorIncidents:', error);
   } finally {
-    isMonitoring = false;
+    logger.info('Scheduling next run of monitorIncidents');
     setTimeout(monitorIncidents, 60000); // Run every minute
   }
 }
-
-// async function notifyNearbyUsers(incident) {
-//   const nearbyUsers = await getUsersFromAuth0({
-//     location: {
-//       $near: {
-//         $geometry: {
-//           type: "Point",
-//           coordinates: [incident.location.coordinates[1], incident.location.coordinates[0]]
-//         },
-//         $maxDistance: incident.impactRadius * 1609.34 // Convert miles to meters
-//       }
-//     }
-//   });
-
-//   for (const user of nearbyUsers) {
-//     const notification = generateNotification(incident, user.location);
-//     await sendNotification(user, notification);
-//   }
-// }
 
 async function updateLLMModel() {
   try {
@@ -147,6 +145,4 @@ setInterval(updateLLMModel, 24 * 60 * 60 * 1000);
 // Run the monitoring function every 5 minutes
 setInterval(monitorIncidents, 5 * 60 * 1000);
 
-console.log('Incident monitoring worker started');
-
-export { monitorIncidents };
+logger.info('Incident monitoring worker loaded');

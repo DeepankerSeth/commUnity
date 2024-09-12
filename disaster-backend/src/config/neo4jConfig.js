@@ -1,4 +1,5 @@
 import neo4j from 'neo4j-driver';
+import logger from '../utils/logger.js';
 
 export const driver = neo4j.driver(
   process.env.NEO4J_URI,
@@ -9,14 +10,22 @@ export const initializeNeo4j = async () => {
   const session = driver.session();
   try {
     const result = await session.run('RETURN 1 AS num');
-    console.log('Successfully connected to Neo4j');
-    return result.records[0].get('num').toNumber() === 1;
+    logger.info('Successfully connected to Neo4j');
+    return true;
   } catch (error) {
-    console.error('Error connecting to Neo4j:', error);
+    logger.error('Error connecting to Neo4j:', error);
     return false;
   } finally {
     await session.close();
   }
+};
+
+export const getDriver = () => {
+  return driver;
+};
+
+export const closeNeo4jConnection = async () => {
+  await driver.close();
 };
 
 process.on('exit', () => {

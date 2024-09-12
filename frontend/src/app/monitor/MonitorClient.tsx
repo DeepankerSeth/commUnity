@@ -3,10 +3,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { SeverityBadge } from "@/components/ui/severity-badge";
 import { getNearbyIncidents } from "@/lib/disasterAPI";
-import DisasterIcon from "@/components/ui/icons";
+import { DisasterIcon } from "@/components/ui/DisasterIcon";
 import { LocationSearch } from '@/components/LocationSearch';
 import { FacetedSearch } from '@/components/FacetedSearch';
 import { performHybridSearch } from '@/lib/disasterAPI';
@@ -31,12 +30,6 @@ interface Incident {
   distance?: number;
 }
 
-const getSeverityColor = (severity: number) => {
-  if (severity >= 8) return 'bg-red-500 text-red-50';
-  if (severity >= 5) return 'bg-yellow-500 text-yellow-50';
-  return 'bg-green-500 text-green-50';
-};
-
 const MonitorClient: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [filters, setFilters] = useState<IncidentFiltersType>({
@@ -53,6 +46,15 @@ const MonitorClient: React.FC = () => {
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
   const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([]);
   const { latitude, longitude, error: locationError, loading: locationLoading } = useGeolocation();
+
+  const performSearch = useCallback(async (term: string) => {
+    try {
+      const results = await performHybridSearch(term);
+      setFilteredIncidents(results);
+    } catch (error) {
+      console.error('Error performing search:', error);
+    }
+  }, []);
 
   const fetchIncidents = useCallback(async () => {
     if (latitude === null || longitude === null) return;
@@ -105,16 +107,7 @@ const MonitorClient: React.FC = () => {
     } else {
       setFilteredIncidents(incidents);
     }
-  }, [debouncedSearchTerm, incidents]);
-
-  const performSearch = useCallback(async (term: string) => {
-    try {
-      const results = await performHybridSearch(term);
-      setFilteredIncidents(results);
-    } catch (error) {
-      console.error('Error performing search:', error);
-    }
-  }, []);
+  }, [debouncedSearchTerm, incidents, performSearch]);
 
   const displayedIncidents = useMemo(() => {
     return filteredIncidents
@@ -139,14 +132,17 @@ const MonitorClient: React.FC = () => {
     setPage(prevPage => prevPage + 1);
   };
 
+  const handleLocationSelect = (lat: number, lon: number) => {
+    console.log(`Selected location: ${lat}, ${lon}`);
+    // Here you would typically update your state or fetch new incidents based on this location
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Incident Monitor</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
-          <LocationSearch onLocationSelect={(lat, lon) => {
-            // Update location if needed
-          }} />
+          <LocationSearch onLocationSelect={handleLocationSelect} />
           <FacetedSearch />
           <IncidentFilters onFilterChange={setFilters} />
         </div>
@@ -163,9 +159,7 @@ const MonitorClient: React.FC = () => {
                   <DisasterIcon type={incident.type} className="w-6 h-6 mr-2" />
                   {incident.type}
                 </span>
-                <Badge className={getSeverityColor(incident.severity)}>
-                  Severity: {incident.severity}
-                </Badge>
+                <SeverityBadge severity={incident.severity} />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -184,17 +178,20 @@ const MonitorClient: React.FC = () => {
                   Distance: {incident.distance.toFixed(2)} km
                 </p>
               )}
-              <Link href={`/incident/${incident._id}`} passHref>
-                <Button className="mt-2" asChild>
-                  <a>View Details</a>
-                </Button>
+              <Link href={`/incident/${incident._id}`} className="inline-block mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                View Details
               </Link>
             </CardContent>
           </Card>
         ))}
       </div>
       {hasMore && (
-        <Button onClick={loadMore} className="mt-4">Load More</Button>
+        <button 
+          onClick={loadMore} 
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          Load More
+        </button>
       )}
       {locationLoading && <p>Loading incidents...</p>}
     </div>

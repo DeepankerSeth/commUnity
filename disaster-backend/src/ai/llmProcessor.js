@@ -12,12 +12,12 @@ import { initializeVectorStore } from '../utils/vectorStoreInitializer.js';
 import { performHybridSearch } from '../services/searchService.js';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.UPDATED_OPEN_AI_API_KEY,
 });
 
 // Initialize OpenAI embeddings
 const embeddings = new OpenAIEmbeddings({
-  openAIApiKey: process.env.OPENAI_API_KEY,
+  openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
 });
 
 console.log('Embeddings object:', embeddings);
@@ -29,7 +29,7 @@ const pinecone = new Pinecone({
 });
 const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX);
 
-console.log('OPENAI_API_KEY in llmProcessor working:', process.env.OPENAI_API_KEY);
+console.log('UPDATED_OPEN_AI_API_KEY in llmProcessor working:', process.env.UPDATED_OPEN_AI_API_KEY);
 console.log('PINECONE_API_KEY in llmProcessor working:', process.env.PINECONE_API_KEY);
 
 // Initialize PineconeStore with the correct embeddings object
@@ -62,7 +62,9 @@ export async function generateEmbedding(text) {
 
 async function processIncident(incident) {
   try {
-    const chat = new ChatOpenAI({ temperature: 0.7 });
+    const chat = new ChatOpenAI({ 
+      openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
+      temperature: 0.7 });
     const prompt = ChatPromptTemplate.fromTemplate(`
       Analyze the following incident:
       Type: {type}
@@ -105,7 +107,7 @@ async function processIncident(incident) {
       description: incident.description || "No description provided",
       latitude: incident.latitude || incident.location?.coordinates?.[1] || "Unknown",
       longitude: incident.longitude || incident.location?.coordinates?.[0] || "Unknown",
-      mediaUrls: incident.mediaUrls ? incident.mediaUrls.join(', ') : 'None'
+      mediaUrls: incident.mediaUrls || 'None'
     });
 
     console.log("LLM Response:", response);

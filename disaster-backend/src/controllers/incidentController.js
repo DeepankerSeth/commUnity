@@ -5,9 +5,15 @@ import { Storage } from '@google-cloud/storage';
 import { emitIncidentUpdate, emitNewIncident } from '../services/socketService.js';
 import { analyzeTrends, getPredictiveModel } from '../services/trendAnalysisService.js';
 import { getHeatmapData, getTimeSeriesData } from '../services/visualizationService.js';
-import { createNewIncidentReportNeo4j, getIncidentReportsNearLocation } from '../services/graphDatabaseService.js';
+import { createNewIncidentReportNeo4j, getIncidentReportsNearLocation, updateIncidentReport } from '../services/graphDatabaseService.js';
 import { getIPGeolocation, calculateDistance } from '../services/geolocationService.js';
 import { createNewIncidentReport } from '../services/incidentService.js';
+import { performNaturalLanguageSearch } from '../services/searchService.js';
+import { generateAutomatedResponse } from '../services/responseGenerationService.js';
+import { analyzeIncidentImage } from '../services/mediaAnalysisService.js';
+import { planEvacuationRoutes } from '../services/evacuationService.js';
+import { verifyIncidentAutomatically } from '../services/verificationService.js';
+import { assessRiskDynamically } from '../services/riskScoringService.js';
 import logger from '../utils/logger.js';
 
 const storage = new Storage();
@@ -20,17 +26,18 @@ export const createIncident = async (req, res) => {
     const mediaFiles = req.files || [];
     const userIP = req.ip;
 
-    // Get user's IP-based location
     const ipLocation = await getIPGeolocation(userIP);
 
-    // Upload media files to Google Cloud Storage
-    const mediaUrls = await Promise.all(mediaFiles.map
-      (async (file) => {
-        const blob = bucket.file(`${Date.now()}-${file.
-        originalname}`);
-        const blobStream = blob.createWriteStream();  
+    const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
+      const blob = bucket.file(`${Date.now()}-${file.originalname}`);
+      const blobStream = blob.createWriteStream();
+      return new Promise((resolve, reject) => {
+        blobStream.on('error', (err) => reject(err));
+        blobStream.on('finish', () => resolve(blob.publicUrl()));
+        blobStream.end(file.buffer);
+      });
+    }));
 
-    // Calculate distance between reported location and IP-based location
     const distance = calculateDistance(
       latitude, 
       longitude, 
@@ -38,96 +45,55 @@ export const createIncident = async (req, res) => {
       ipLocation.longitude
     );
 
-    return new Promise((resolve, reject) => {
-      blobStream.on('error', (err) => reject(err));
-      blobStream.on('finish', () => resolve(blob.
-      publicUrl()));
-      blobStream.end(file.buffer);
-    });
-  }));
-
-    // If the distance is more than 5km, flag the report for review
     const needsReview = distance > 5;
 
     const incidentData = { 
       type, 
       description, 
-      latitude: parseFloat(latitude), 
-      longitude: parseFloat(longitude), 
+      location: {
+        type: 'Point',
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+      },
       reporterIP: userIP,
-      ipLatitude: ipLocation.latitude,
-      ipLongitude: ipLocation.longitude,
+      ipLocation: ipLocation,
       needsReview,
       mediaUrls
     };
 
-    const incidentReport = await createNewIncidentReportNeo4j(incidentData);
+    const incidentReport = await createNewIncidentReport(incidentData);
 
-    // Process the incident
     const analysis = await processIncident(incidentReport);
 
-    // Update the incident report with the analysis
-    incidentReport.analysis = analysis.analysis;
-    incidentReport.severity = analysis.severity;
-    incidentReport.impactRadius = analysis.impactRadius;
-    incidentReport.metadata = analysis.metadata;
-
-    await updateIncidentReport(incidentReport.id, {
+    const updatedIncident = await updateIncidentReport(incidentReport.id, {
       analysis: analysis.analysis,
       severity: analysis.severity,
       impactRadius: analysis.impactRadius,
-      metadata: analysis.metadata
+      metadata: {
+        ...analysis,
+        keywords: analysis.keywords || [],
+        incidentName: analysis.incidentName || 'Unnamed Incident',
+        placeOfImpact: analysis.placeOfImpact || 'Unknown Location',
+        neighborhood: analysis.neighborhood || 'Unknown Neighborhood'
+      }
     });
 
-    // Emit new incident event
-    emitNewIncident(incidentReport);
+    emitNewIncident(updatedIncident);
 
-    // Check for similar incidents and send notifications if necessary
-    await checkSimilarIncidentsAndNotify(incidentReport);
+    await checkSimilarIncidentsAndNotify(updatedIncident);
 
-    res.status(201).json(incidentReport);
+    res.status(201).json(updatedIncident);
   } catch (error) {
     logger.error('Error creating incident:', error);
-    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'An error occurred while creating the incident' });
   }
-}
-
-export async function provideFeedback(req, res) {
-  try {
-    const { incidentId } = req.params;
-    const { feedback } = req.body;
-
-    const updatedIncident = await updateMetadataWithFeedback(incidentId, feedback);
-
-    // Process feedback for LLM fine-tuning
-    await processFeedback(incidentId, feedback);
-
-    // Emit incident update event
-    emitIncidentUpdate(incidentId, {
-      description: updatedIncident.description,
-      analysis: updatedIncident.analysis,
-      severity: updatedIncident.severity,
-      impactRadius: updatedIncident.impactRadius,
-      metadata: updatedIncident.metadata
-    });
-
-    res.status(200).json({
-      message: 'Feedback processed and incident metadata updated',
-      incident: updatedIncident
-    });
-  } catch (error) {
-    console.error('Error processing feedback:', error);
-    res.status(500).json({ error: 'An error occurred while processing feedback' });
-  }
-}
+};
 
 export const getTrendAnalysis = async (req, res) => {
   try {
     const analysis = await analyzeTrends();
     res.json(analysis);
   } catch (error) {
-    console.error('Error performing trend analysis:', error);
+    logger.error('Error performing trend analysis:', error);
     res.status(500).json({ error: 'An error occurred while performing trend analysis' });
   }
 };
@@ -137,7 +103,7 @@ export const getPredictions = async (req, res) => {
     const predictions = await getPredictiveModel();
     res.json(predictions);
   } catch (error) {
-    console.error('Error generating predictions:', error);
+    logger.error('Error generating predictions:', error);
     res.status(500).json({ error: 'An error occurred while generating predictions' });
   }
 };
@@ -148,7 +114,7 @@ export const getVisualizationData = async (req, res) => {
     const timeSeriesData = await getTimeSeriesData();
     res.json({ heatmapData, timeSeriesData });
   } catch (error) {
-    console.error('Error fetching visualization data:', error);
+    logger.error('Error fetching visualization data:', error);
     res.status(500).json({ error: 'An error occurred while fetching visualization data' });
   }
 };
@@ -156,10 +122,112 @@ export const getVisualizationData = async (req, res) => {
 export const getNearbyIncidents = async (req, res) => {
   try {
     const { latitude, longitude, radius = 10000 } = req.query; // radius in meters, default 10km
-    const incidents = await getIncidentReportsNearLocation(latitude, longitude, radius);
+    const incidents = await getIncidentReportsNearLocation(parseFloat(latitude), parseFloat(longitude), parseFloat(radius));
     res.json(incidents);
   } catch (error) {
     logger.error('Error fetching nearby incidents:', error);
     res.status(500).json({ error: 'An error occurred while fetching nearby incidents' });
   }
+};
+
+export const searchIncidents = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const results = await performNaturalLanguageSearch(query);
+    res.json(results);
+  } catch (error) {
+    logger.error('Error performing natural language search:', error);
+    res.status(500).json({ error: 'An error occurred while searching incidents' });
+  }
+};
+
+export const getAutomatedResponse = async (req, res) => {
+  try {
+    const { incidentType } = req.params;
+    const response = await generateAutomatedResponse(incidentType);
+    res.json(response);
+  } catch (error) {
+    logger.error('Error generating automated response:', error);
+    res.status(500).json({ error: 'An error occurred while generating automated response' });
+  }
+};
+
+export const analyzeIncidentMedia = async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    const analysis = await analyzeIncidentImage(imageUrl);
+    res.json(analysis);
+  } catch (error) {
+    logger.error('Error analyzing incident media:', error);
+    res.status(500).json({ error: 'An error occurred while analyzing incident media' });
+  }
+};
+
+export const getEvacuationPlan = async (req, res) => {
+  try {
+    const { incidentLocation, safeZones, populationDensity } = req.body;
+    const plan = await planEvacuationRoutes(incidentLocation, safeZones, populationDensity);
+    res.json(plan);
+  } catch (error) {
+    logger.error('Error planning evacuation routes:', error);
+    res.status(500).json({ error: 'An error occurred while planning evacuation routes' });
+  }
+};
+
+export const verifyIncident = async (req, res) => {
+  try {
+    const { incidentReport } = req.body;
+    const verificationResult = await verifyIncidentAutomatically(incidentReport);
+    res.json(verificationResult);
+  } catch (error) {
+    logger.error('Error verifying incident:', error);
+    res.status(500).json({ error: 'An error occurred while verifying the incident' });
+  }
+};
+
+export const assessRisk = async (req, res) => {
+  try {
+    const { currentIncident, historicalIncidents, realTimeData } = req.body;
+    const riskAssessment = await assessRiskDynamically(currentIncident, historicalIncidents, realTimeData);
+    res.json(riskAssessment);
+  } catch (error) {
+    logger.error('Error assessing risk:', error);
+    res.status(500).json({ error: 'An error occurred while assessing risk' });
+  }
+};
+
+export const provideFeedback = async (req, res) => {
+  try {
+    const { incidentId } = req.params;
+    const { feedback } = req.body;
+
+    const updatedIncident = await updateIncidentReport(incidentId, {
+      feedback: feedback
+    });
+
+    emitIncidentUpdate(incidentId, updatedIncident);
+
+    res.status(200).json({
+      message: 'Feedback processed and incident metadata updated',
+      incident: updatedIncident
+    });
+  } catch (error) {
+    logger.error('Error processing feedback:', error);
+    res.status(500).json({ error: 'An error occurred while processing feedback' });
+  }
+};
+
+export default {
+  createIncident,
+  getTrendAnalysis,
+  getPredictions,
+  getVisualizationData,
+  getNearbyIncidents,
+  searchIncidents,
+  getAutomatedResponse,
+  analyzeIncidentMedia,
+  getEvacuationPlan,
+  verifyIncident,
+  assessRisk,
+  provideFeedback
 };

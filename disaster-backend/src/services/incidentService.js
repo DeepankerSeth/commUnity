@@ -1,15 +1,31 @@
+//disaster-backend/src/services/incidentService.js
+
 import { processIncident } from '../ai/llmProcessor.js';
-import { createNewIncidentReportNeo4j, getIncidentReportsNeo4j, updateIncidentReport } from './graphDatabaseService.js';
+import { createNewIncidentReportNeo4j } from './graphDatabaseService.js';
+import { getIncidentReportNeo4j } from './graphDatabaseService.js';
 
 export async function createNewIncidentReport(incidentData) {
   console.log('Received incident data:', incidentData);
   const analysis = await processIncident(incidentData);
-  const combinedData = { ...incidentData, ...analysis };
+  const combinedData = { 
+    ...incidentData, 
+    ...analysis,
+    metadata: {
+      ...incidentData.metadata,
+      ...analysis,
+      keywords: analysis.keywords || [],
+      incidentName: analysis.incidentName || 'Unnamed Incident',
+      placeOfImpact: analysis.placeOfImpact || 'Unknown Location',
+      neighborhood: analysis.neighborhood || 'Unknown Neighborhood'
+    },
+    severity: analysis.severity || 0,
+    impactRadius: analysis.impactRadius || 0
+  };
   return createNewIncidentReportNeo4j(combinedData);
 }
 
-export async function getIncidentReport(id) {
-  return getIncidentReportsNeo4j(id);
+export async function getIncidentReport(query) {
+  return getIncidentReportNeo4j(query);
 }
 
 export async function updateIncidentBasedOnFeedback(incidentId, accuracy, usefulness) {

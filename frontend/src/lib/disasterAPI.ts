@@ -180,3 +180,17 @@ export async function regenerateApiKey() {
   const response = await api.post('/api-key/regenerate');
   return response.data;
 }
+
+// This needs to be made/created/implemented later
+export interface EvacuationRoute {
+  name: string;
+  description: string;
+}
+
+export const getEvacuationInstructions = async (start: string, end: string): Promise<EvacuationRoute[]> => {
+  // This is a placeholder implementation. Replace with actual API call.
+  return [
+    { name: "Route 1", description: "Description for Route 1" },
+    { name: "Route 2", description: "Description for Route 2" },
+  ];
+};

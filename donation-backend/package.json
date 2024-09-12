@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node --experimental-specifier-resolution=node index.js",
+    "dev": "nodemon --experimental-specifier-resolution=node index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo 'No build step required for donation-backend'"
   },
@@ -30,5 +30,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
-  }
+  },
+  "type": "module"
 }

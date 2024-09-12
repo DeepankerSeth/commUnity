@@ -1,6 +1,8 @@
-require('dotenv').config();
-const app = require('./app');
-const logger = require('./src/utils/logger');
+import dotenv from 'dotenv';
+import app from './app.js';
+import logger from './src/utils/logger.js';
+
+dotenv.config();
 
 const port = process.env.PORT || 3000;
 let server;

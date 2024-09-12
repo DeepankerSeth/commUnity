@@ -1,19 +1,24 @@
 "use strict";
 
-require('dotenv').config();
+var _dotenv = _interopRequireDefault(require("dotenv"));
 
-var app = require('./app');
+var _app = _interopRequireDefault(require("./app.js"));
 
-var logger = require('./src/utils/logger');
+var _logger = _interopRequireDefault(require("./src/utils/logger.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
+
+_dotenv["default"].config();
 
 var port = process.env.PORT || 3000;
 var server;
 
 var startServer = function startServer(port) {
-  server = app.listen(port, function () {
+  server = _app["default"].listen(port, function () {
     var actualPort = server.address().port;
     console.log("Donation backend server is running on port ".concat(actualPort));
-    logger.info("Server is running on port ".concat(actualPort));
+
+    _logger["default"].info("Server is running on port ".concat(actualPort));
   }).on('error', function (error) {
     if (error.syscall !== 'listen') {
       throw error;

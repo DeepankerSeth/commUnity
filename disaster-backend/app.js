@@ -62,7 +62,10 @@ app.use('/api', searchRoutes); // Added route for search
 app.use('/api', apiForMobileRoutes); // This includes the new LangChain-powered routes
 
 // Global error handler
-app.use(errorHandler);
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'An unexpected error occurred' });
+});
 
 // Error logging
 app.use((err, req, res, next) => {

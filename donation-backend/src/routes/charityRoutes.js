@@ -1,8 +1,7 @@
-const express = require('express');
-const { check } = require('express-validator');
-const charityController = require('../controllers/charityController');
-const validate = require('../middleware/validate');
-const authenticateUser = require('../middleware/auth');
+import express from 'express';
+import { check } from 'express-validator';
+import * as charityController from '../controllers/charityController.js';
+import validate from '../middleware/validate.js';
 
 const router = express.Router();
 
@@ -30,4 +29,4 @@ router.post('/donate-link', [
     validate
 ], charityController.generateDonateLink);
 
-module.exports = router;
+export default router;

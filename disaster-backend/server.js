@@ -8,10 +8,13 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import logger from './src/utils/logger.js';
+import { checkEnv } from './checkEnv.js';
+import { closeNeo4jConnection } from './src/config/neo4jConfig.js';
+import { getRedisClient } from './src/services/statisticsService.js';
 
 console.log('Loading server.js');
 
-console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+console.log('UPDATED_OPEN_AI_API_KEY:', process.env.UPDATED_OPEN_AI_API_KEY);
 console.log('PINECONE_API_KEY:', process.env.PINECONE_API_KEY);
 
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -36,8 +39,7 @@ async function startServer(attempt = 0) {
   try {
     const neo4jConnected = await initializeNeo4j();
     if (!neo4jConnected) {
-      logger.error('Failed to connect to Neo4j. Exiting...');
-      process.exit(1);
+      logger.warn('Failed to connect to Neo4j. Continuing without Neo4j...');
     }
     await new Promise((resolve, reject) => {
       server.listen(currentPort, () => {
@@ -66,4 +68,30 @@ async function startServer(attempt = 0) {
   }
 }
 
+checkEnv();
+
 startServer();
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+async function gracefulShutdown(signal) {
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+
+  server.close(() => {
+    logger.info('HTTP server closed');
+  });
+
+  const redisClient = await getRedisClient();
+  if (redisClient.isOpen) {
+    await redisClient.quit();
+    logger.info('Redis connection closed');
+  }
+
+  await closeNeo4jConnection();
+
+  // Close other connections or perform cleanup here
+
+  logger.info('Graceful shutdown completed');
+  process.exit(0);
+}

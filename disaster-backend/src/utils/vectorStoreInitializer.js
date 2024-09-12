@@ -39,7 +39,7 @@ export async function initializeVectorStore() {
     }
 
     const embeddings = new OpenAIEmbeddings({ 
-      openAIApiKey: process.env.OPENAI_API_KEY,
+      openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
       modelName: "text-embedding-3-large"
     });
 

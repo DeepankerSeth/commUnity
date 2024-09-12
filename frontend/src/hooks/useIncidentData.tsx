@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getIncidentDetails, getIncidentCluster, provideFeedback } from '../lib/disasterAPI';
 import { useSocket } from '../context/SocketContext';
 
@@ -32,6 +32,31 @@ export function useIncidentData(incidentId: string) {
   const [error, setError] = useState<string | null>(null);
   const socket = useSocket();
 
+  const handleIncidentUpdate = useCallback((updatedIncident: Incident) => {
+    if (updatedIncident._id === incidentId) {
+      setIncident(prevIncident => ({ ...prevIncident, ...updatedIncident }));
+    }
+  }, [incidentId]);
+
+  const handleVerificationUpdate = useCallback((verificationData: { incidentId: string; verificationScore: number; verificationStatus: string }) => {
+    if (verificationData.incidentId === incidentId) {
+      setIncident(prevIncident => prevIncident ? { 
+        ...prevIncident, 
+        verificationScore: verificationData.verificationScore,
+        verificationStatus: verificationData.verificationStatus
+      } : null);
+    }
+  }, [incidentId]);
+
+  const handleNewUpdate = useCallback((update: { incidentId: string; update: string; severity: number; impactRadius: number; timestamp: string }) => {
+    if (update.incidentId === incidentId) {
+      setIncident(prevIncident => prevIncident ? {
+        ...prevIncident,
+        timeline: [...prevIncident.timeline, update]
+      } : null);
+    }
+  }, [incidentId]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -62,32 +87,7 @@ export function useIncidentData(incidentId: string) {
       socket.off('verificationUpdate', handleVerificationUpdate);
       socket.off('newUpdate', handleNewUpdate);
     };
-  }, [incidentId, socket]);
-
-  const handleIncidentUpdate = (updatedIncident: Incident) => {
-    if (updatedIncident._id === incidentId) {
-      setIncident(prevIncident => ({ ...prevIncident, ...updatedIncident }));
-    }
-  };
-
-  const handleVerificationUpdate = (verificationData: { incidentId: string; verificationScore: number; verificationStatus: string }) => {
-    if (verificationData.incidentId === incidentId) {
-      setIncident(prevIncident => prevIncident ? { 
-        ...prevIncident, 
-        verificationScore: verificationData.verificationScore,
-        verificationStatus: verificationData.verificationStatus
-      } : null);
-    }
-  };
-
-  const handleNewUpdate = (update: { incidentId: string; update: string; severity: number; impactRadius: number; timestamp: string }) => {
-    if (update.incidentId === incidentId) {
-      setIncident(prevIncident => prevIncident ? {
-        ...prevIncident,
-        timeline: [...prevIncident.timeline, update]
-      } : null);
-    }
-  };
+  }, [incidentId, socket, handleIncidentUpdate, handleVerificationUpdate, handleNewUpdate]);
 
   const handleUserFeedback = async (accuracy: number, usefulness: number) => {
     try {
