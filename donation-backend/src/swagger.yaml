@@ -1,0 +1,201 @@
+openapi: 3.0.0
+info:
+  title: Donation Backend API
+  version: 1.0.0
+  description: API for managing nonprofit donations and fundraisers
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+
+paths:
+  /charities/search/{searchTerm}:
+    get:
+      summary: Search for nonprofits
+      parameters:
+        - in: path
+          name: searchTerm
+          required: true
+          schema:
+            type: string
+          description: Term to search for nonprofits
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nonprofits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Nonprofit'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /charities/details/{identifier}:
+    get:
+      summary: Get nonprofit details
+      parameters:
+        - in: path
+          name: identifier
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the nonprofit
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonprofitDetails'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /charities/fundraiser:
+    post:
+      summary: Create a fundraiser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nonprofitId
+                - title
+                - description
+              properties:
+                nonprofitId:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fundraiser'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /charities/donate-link:
+    post:
+      summary: Generate a donate link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DonateLinkRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donateLink:
+                    type: string
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    Nonprofit:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    NonprofitDetails:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        website:
+          type: string
+        logoUrl:
+          type: string
+
+    Fundraiser:
+      type: object
+      properties:
+        id:
+          type: string
+        nonprofitId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+
+    DonateLinkRequest:
+      type: object
+      required:
+        - identifier
+      properties:
+        identifier:
+          type: string
+        amount:
+          type: number
+        suggestedAmounts:
+          type: array
+          items:
+            type: number
+        min_value:
+          type: number
+        frequency:
+          type: string
+          enum: [ONCE, MONTHLY, YEARLY]
+        first_name:
+          type: string
+        last_name:
+          type: string
+        description:
+          type: string
+        no_exit:
+          type: boolean
+        success_url:
+          type: string
+        exit_url:
+          type: string
+        partner_donation_id:
+          type: string
+        partner_metadata:
+          type: string
+        require_share_info:
+          type: boolean
+        share_info:
+          type: boolean
+        designation:
+          type: string
+        webhook_token:
+          type: string
+        theme_color:
+          type: string
+        method:
+          type: string
+          enum: [CARD, BANK, PAYPAL]

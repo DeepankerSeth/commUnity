@@ -1,0 +1,39 @@
+.env.local
+
+# Node modules
+node_modules/
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage reports
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# Lock files
+yarn.lock
+package-lock.json
+
+expo-env.d.ts

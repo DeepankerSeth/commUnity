@@ -1,0 +1,49 @@
+{
+  "name": "community",
+  "version": "1.0.0",
+  "description": "A platform that predicts natural disasters, finds local resources and connects donors with charities making meaningful impact.",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm run install:frontend && npm run install:disaster-backend && npm run install:donation-backend",
+    "install:frontend": "cd frontend && npm install",
+    "install:disaster-backend": "cd disaster-backend && npm install",
+    "install:donation-backend": "cd donation-backend && npm install",
+    "build": "npm run build:frontend && npm run build:disaster-backend && npm run build:donation-backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:disaster-backend": "cd disaster-backend && npm run build",
+    "build:donation-backend": "cd donation-backend && npm run build",
+    "start": "npm run start:frontend & npm run start:disaster-backend & npm run start:donation-backend",
+    "start:frontend": "cd frontend && npm start",
+    "start:disaster-backend": "cd disaster-backend && npm start",
+    "start:donation-backend": "cd donation-backend && npm start",
+    "dev": "npm run dev:frontend & npm run dev:disaster-backend & npm run dev:donation-backend",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:disaster-backend": "cd disaster-backend && npm run dev",
+    "dev:donation-backend": "cd donation-backend && npm run dev",
+    "setup": "npm install && npm run install:all && npm run build",
+    "test": "npm run test:frontend && npm run test:disaster-backend && npm run test:donation-backend",
+    "test:frontend": "cd frontend && npm test",
+    "test:disaster-backend": "cd disaster-backend && npm test",
+    "test:donation-backend": "cd donation-backend && npm test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
+    "concurrently": "^6.2.0"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.20.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0",
+    "winston": "^3.14.2",
+    "xss-clean": "^0.1.4",
+    "yamljs": "^0.3.0"
+  }
+}
