@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Search, AlertTriangle, Activity, Users } from "lucide-react";
 import Footer from "@/components/Footer";
 
-function Homepage() {
+function HomepageClient() {
   const [showReportIncident, setShowReportIncident] = useState(false);
   const reportIncidentRef = useRef<HTMLDivElement>(null);
   const [incidents, setIncidents] = useState([]);
@@ -112,4 +112,4 @@ function Homepage() {
   );
 }
 
-export default Homepage;
+export default HomepageClient;

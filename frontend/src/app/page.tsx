@@ -1,6 +1,6 @@
 'use client';
-
-import Homepage from "./Homepage/page";
+import React from 'react';
+import Homepage from './homepage/page';
 import Layout from "@/components/Layout";
 import { Header } from "@/components/Header";
 
