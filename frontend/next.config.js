@@ -10,6 +10,7 @@ const nextConfig = {
     return config;
   },
   // Remove any references to 'dist' here if they exist
+  transpilePackages: ['axios'],
 };
 
 module.exports = nextConfig;
