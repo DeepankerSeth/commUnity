@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getDisasterBackendUrl } from '../utils/api';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -16,13 +17,18 @@ export const SocketProvider: React.FC<{ token: string | null; children: React.Re
 
   useEffect(() => {
     if (token) {
-      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
-        auth: { token },
-      });
-      setSocket(newSocket);
+      const connectSocket = async () => {
+        const backendUrl = await getDisasterBackendUrl();
+        const newSocket = io(backendUrl, {
+          auth: { token },
+        });
+        setSocket(newSocket);
+      };
+
+      connectSocket();
 
       return () => {
-        newSocket.close();
+        if (socket) socket.close();
       };
     } else {
       setSocket(null);

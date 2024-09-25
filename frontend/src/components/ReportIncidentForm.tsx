@@ -68,7 +68,9 @@ export default function ReportIncidentForm() {
     }
 
     try {
-      await reportIncident(formData);
+      console.log('Submitting form data:', Object.fromEntries(formData));
+      const response = await reportIncident(formData);
+      console.log('Incident report response:', response);
       toast({
         title: "Success",
         description: "Incident reported successfully!",

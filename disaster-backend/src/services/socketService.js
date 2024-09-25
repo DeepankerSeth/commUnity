@@ -6,7 +6,7 @@ let io;
 export function initializeSocketIO(server) {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: process.env.FRONTEND_URL || `http://localhost:3000`,
       methods: ['GET', 'POST']
     }
   });
@@ -17,6 +17,8 @@ export function initializeSocketIO(server) {
       console.log('Client disconnected');
     });
   });
+
+  console.log('Socket.IO initialized');
 }
 
 export function emitIncidentUpdate(incidentId, updatedIncident) {

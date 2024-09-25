@@ -1,9 +1,8 @@
 import axios from 'axios';
-
-const DONATION_API_URL = process.env.NEXT_PUBLIC_DONATION_API_URL || 'http://localhost:3001';
+import { getDonationBackendUrl } from '../utils/api';
 
 const api = axios.create({
-  baseURL: DONATION_API_URL,
+  baseURL: getDonationBackendUrl(),
 });
 
 api.interceptors.request.use((config: any) => {
@@ -16,7 +15,7 @@ api.interceptors.request.use((config: any) => {
 
 export const searchNonprofits = async (searchTerm: string, take?: number, causes?: string) => {
   const response = await api.get(`/api/charities/search/${searchTerm}`, {
-    params: { take, causes }
+    params: { take, causes },
   });
   return response.data;
 };
@@ -28,7 +27,9 @@ export const getNonprofitDetails = async (nonprofitId: string) => {
 
 export const createFundraiser = async (nonprofitId: string, title: string, description: string) => {
   const response = await api.post(`/api/charities/fundraiser`, {
-    nonprofitId, title, description
+    nonprofitId,
+    title,
+    description,
   });
   return response.data;
 };

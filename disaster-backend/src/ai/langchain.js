@@ -22,6 +22,7 @@ const openai = new OpenAI({
 });
 
 const embeddings = new OpenAIEmbeddings({
+  modelName: "text-embedding-3-small",
   openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
 });
 

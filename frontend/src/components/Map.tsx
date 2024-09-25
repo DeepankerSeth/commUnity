@@ -6,6 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useGeolocation } from '../hooks/useGeoLocation';
 import { socketService } from '../services/socketService';
+import { getDisasterBackendUrl } from '../utils/api';
 
 interface Incident {
   _id: string;
@@ -29,6 +30,13 @@ const Map: React.FC = () => {
   const { latitude, longitude, error: locationError, loading: locationLoading } = useGeolocation();
 
   useEffect(() => {
+    const fetchData = async () => {
+      const backendUrl = await getDisasterBackendUrl();
+      // Use backendUrl for any direct API calls
+      // Example: const response = await fetch(`${backendUrl}/api/incidents`);
+    };
+    fetchData();
+
     // Fetch initial incidents and clusters
     fetchIncidents();
     fetchClusters();

@@ -1,5 +1,7 @@
 console.log('Loading incidentController.js');
-import { processIncident, updateMetadataWithFeedback } from '../ai/llmProcessor.js';
+
+import { runQuery } from '../config/neo4jConfig.js';
+import { processIncident } from '../ai/llmProcessor.js';
 import { checkSimilarIncidentsAndNotify } from '../services/notificationService.js';
 import { Storage } from '@google-cloud/storage';
 import { emitIncidentUpdate, emitNewIncident } from '../services/socketService.js';
@@ -21,13 +23,24 @@ const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
 
 export const createIncident = async (req, res) => {
   try {
-    console.log('Received incident data:', req.body);
+    logger.info('Received incident data:', req.body);
     const { type, description, latitude, longitude } = req.body;
     const mediaFiles = req.files || [];
     const userIP = req.ip;
 
-    const ipLocation = await getIPGeolocation(userIP);
+    // Get IP geolocation
+    let ipLocation = await getIPGeolocation(userIP);
 
+    // Handle cases where ipLocation might be undefined or null
+    if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
+      ipLocation = { latitude: null, longitude: null };
+    }
+
+    // Extract ipLatitude and ipLongitude, ensuring they are defined
+    const ipLatitude = ipLocation.latitude;
+    const ipLongitude = ipLocation.longitude;
+
+    // Process media files (if any)
     const mediaUrls = await Promise.all(mediaFiles.map(async (file) => {
       const blob = bucket.file(`${Date.now()}-${file.originalname}`);
       const blobStream = blob.createWriteStream();
@@ -38,38 +51,62 @@ export const createIncident = async (req, res) => {
       });
     }));
 
-    const distance = calculateDistance(
-      latitude, 
-      longitude, 
-      ipLocation.latitude, 
-      ipLocation.longitude
-    );
+    // Calculate distance (handle null values)
+    const distance =
+      latitude && longitude && ipLatitude && ipLongitude
+        ? calculateDistance(latitude, longitude, ipLatitude, ipLongitude)
+        : null;
 
-    const needsReview = distance > 5;
+    const needsReview = distance !== null ? distance > 5 : true;
 
-    const incidentData = { 
-      type, 
-      description, 
-      location: {
-        type: 'Point',
-        coordinates: [parseFloat(longitude), parseFloat(latitude)]
-      },
+    const incidentData = {
+      type,
+      description,
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
       reporterIP: userIP,
-      ipLocation: ipLocation,
+      ipLocation,
       needsReview,
-      mediaUrls
+      mediaUrls,
     };
 
-    const incidentReport = await createNewIncidentReport(incidentData);
+    // Process incident with AI model
+    const analysis = await processIncident(incidentData);
 
-    const analysis = await processIncident(incidentReport);
-
-    const updatedIncident = await updateIncidentReport(incidentReport.id, {
-      analysis: analysis.analysis,
+    // Create the incident in Neo4j
+    const result = await runQuery(`
+      CREATE (i:IncidentReport {
+        id: randomUUID(),
+        type: $type,
+        description: $description,
+        latitude: $latitude,
+        longitude: $longitude,
+        mediaUrls: $mediaUrls,
+        reporterIP: $reporterIP,
+        ipLatitude: $ipLatitude,
+        ipLongitude: $ipLongitude,
+        needsReview: $needsReview,
+        severity: $severity,
+        impactRadius: $impactRadius,
+        analysis: $analysis,
+        createdAt: datetime(),
+        updatedAt: datetime()
+      })
+      RETURN i
+    `, {
+      type,
+      description,
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      mediaUrls,
+      reporterIP: userIP,
+      ipLatitude,
+      ipLongitude,
+      needsReview,
       severity: analysis.severity,
       impactRadius: analysis.impactRadius,
+      analysis: analysis.analysis,
       metadata: {
-        ...analysis,
         keywords: analysis.keywords || [],
         incidentName: analysis.incidentName || 'Unnamed Incident',
         placeOfImpact: analysis.placeOfImpact || 'Unknown Location',
@@ -77,11 +114,17 @@ export const createIncident = async (req, res) => {
       }
     });
 
-    emitNewIncident(updatedIncident);
+    const createdIncident = result[0].get('i').properties;
 
-    await checkSimilarIncidentsAndNotify(updatedIncident);
+    logger.info(`Incident ${createdIncident.id} created successfully`);
 
-    res.status(201).json(updatedIncident);
+    // Emit event to connected clients
+    emitNewIncident(createdIncident);
+
+    res.status(201).json({
+      message: 'Incident reported successfully',
+      incident: createdIncident,
+    });
   } catch (error) {
     logger.error('Error creating incident:', error);
     res.status(500).json({ error: 'An error occurred while creating the incident' });
@@ -122,7 +165,22 @@ export const getVisualizationData = async (req, res) => {
 export const getNearbyIncidents = async (req, res) => {
   try {
     const { latitude, longitude, radius = 10000 } = req.query; // radius in meters, default 10km
-    const incidents = await getIncidentReportsNearLocation(parseFloat(latitude), parseFloat(longitude), parseFloat(radius));
+    const result = await runQuery(`
+      MATCH (i:IncidentReport)
+      WHERE point.distance(point({latitude: i.latitude, longitude: i.longitude}), 
+                           point({latitude: $latitude, longitude: $longitude})) <= $radius
+      RETURN i,
+             point.distance(point({latitude: i.latitude, longitude: i.longitude}), 
+                            point({latitude: $latitude, longitude: $longitude})) AS distance
+      ORDER BY distance
+      LIMIT 50
+    `, { latitude: parseFloat(latitude), longitude: parseFloat(longitude), radius: parseFloat(radius) });
+
+    const incidents = result.map(record => ({
+      ...record.get('i').properties,
+      distance: record.get('distance').toNumber()
+    }));
+
     res.json(incidents);
   } catch (error) {
     logger.error('Error fetching nearby incidents:', error);
@@ -201,9 +259,13 @@ export const provideFeedback = async (req, res) => {
     const { incidentId } = req.params;
     const { feedback } = req.body;
 
-    const updatedIncident = await updateIncidentReport(incidentId, {
-      feedback: feedback
-    });
+    const result = await runQuery(`
+      MATCH (i:IncidentReport {id: $incidentId})
+      SET i.feedback = $feedback, i.updatedAt = datetime()
+      RETURN i
+    `, { incidentId, feedback });
+
+    const updatedIncident = result[0].get('i').properties;
 
     emitIncidentUpdate(incidentId, updatedIncident);
 

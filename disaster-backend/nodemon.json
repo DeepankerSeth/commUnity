@@ -1,5 +1,15 @@
 {
+    "watch": ["src", "app.js", "server.js", "bootstrap.js"],
+    "ext": "js,json",
+    "ignore": [
+        "../*.json",
+        "./*.json",
+        "*.log",
+        "node_modules/*",
+        "dist/*"
+    ],
     "execMap": {
-      "js": "node --experimental-specifier-resolution=node --experimental-modules"
-    }
-  }
+        "js": "node --experimental-specifier-resolution=node --experimental-modules"
+    },
+    "verbose": true
+}

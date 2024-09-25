@@ -27,3 +27,22 @@ node_modules
 */.vscode/
 node_modules
 .DS_Store
+
+# Runtime-generated server info files
+server-info.json
+donation-server-info.json
+disaster-server-info.json
+
+# Environment variables
+**/.env
+**/.env.local
+
+# Logs
+*.log
+
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+.next/

@@ -1,6 +1,5 @@
 console.log('Loading clusteringService.js');
 import { DBSCAN } from 'density-clustering';
-import { driver } from '../config/neo4jConfig.js';
 import { emitClusterUpdate } from './socketService.js';
 import logger from '../utils/logger.js';
 import { getDriver } from '../config/neo4jConfig.js';
@@ -10,6 +9,12 @@ const MIN_POINTS = 2; // Minimum points to form a cluster
 const CACHE_EXPIRY = 300000; // 5 minutes in milliseconds
 
 export async function performClustering() {
+  const driver = getDriver();
+  if (!driver) {
+    logger.warn('Neo4j not connected, skipping clustering');
+    return [];
+  }
+
   const session = driver.session();
   try {
     const result = await session.run(`

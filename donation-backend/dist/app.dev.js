@@ -36,8 +36,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "d
 _dotenv["default"].config();
 
 var app = (0, _express["default"])();
-var port = process.env.PORT || 3000; // Default to 3000 if PORT is not set
-
 app.use((0, _helmet["default"])());
 app.use((0, _xssClean["default"])());
 app.use(_bodyParser["default"].json());
@@ -63,10 +61,6 @@ app.use(function (err, req, res, next) {
   res.status(500).json({
     error: 'An unexpected error occurred'
   });
-});
-var server = app.listen(port, function () {
-  var actualPort = server.address().port;
-  console.log("Donation backend server is running on port ".concat(actualPort));
 });
 var _default = app;
 exports["default"] = _default;

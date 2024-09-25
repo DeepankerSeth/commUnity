@@ -4,36 +4,17 @@ import logger from './src/utils/logger.js';
 
 dotenv.config();
 
-const port = process.env.PORT || 3000;
-let server;
+const port = process.env.PORT || 5001; // Fixed port
 
-const startServer = (port) => {
-  server = app.listen(port, () => {
-    const actualPort = server.address().port;
-    console.log(`Donation backend server is running on port ${actualPort}`);
-    logger.info(`Server is running on port ${actualPort}`);
-  }).on('error', (error) => {
-    if (error.syscall !== 'listen') {
-      throw error;
-    }
+const server = app.listen(port, () => {
+  console.log(`Donation backend server is running on port ${port}`);
+  logger.info(`Server is running on port ${port}`);
+});
 
-    const bind = typeof port === 'string'
-      ? 'Pipe ' + port
-      : 'Port ' + port;
-
-    switch (error.code) {
-      case 'EACCES':
-        console.error(`${bind} requires elevated privileges`);
-        process.exit(1);
-        break;
-      case 'EADDRINUSE':
-        console.error(`${bind} is already in use, trying the next port`);
-        startServer(port + 1);
-        break;
-      default:
-        throw error;
-    }
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
   });
-};
-
-startServer(port);
+});

@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node --experimental-specifier-resolution=node index.js",
-    "dev": "nodemon --experimental-specifier-resolution=node index.js",
+    "dev": "nodemon --verbose --experimental-specifier-resolution=node --ignore '../*.json' --ignore 'server-info.json' --ignore '*.log' index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo 'No build step required for donation-backend'"
   },

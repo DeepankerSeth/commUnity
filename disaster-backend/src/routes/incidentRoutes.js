@@ -2,24 +2,27 @@ console.log('Loading incidentRoutes.js');
 import express from 'express';
 import multer from 'multer';
 import { uploadFile } from '../storage/googleCloudStorage.js';
-import { createNewIncidentReport } from '../services/incidentService.js';
+import { getIncidentReport } from '../services/incidentService.js';
 import { checkSimilarIncidentsAndNotify } from '../services/notificationService.js';
 import { createIncident } from '../controllers/incidentController.js';
 
 const router = express.Router();
-
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/', upload.array('mediaFiles', 5), createIncident);
 
-router.get('/', async (req, res) => {
+
+// Fetch a specific incident by ID
+router.get('/:incidentId', async (req, res) => {
   try {
-    const incidents = await getIncidentReportsNeo4j();
-    res.status(200).json(incidents);
+    const incident = await getIncidentReport(req.params.incidentId);
+    if (!incident) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
+    res.status(200).json(incident);
   } catch (error) {
-    console.error('Error fetching incidents:', error);
-    res.status(500).json({ error: 'An error occurred while fetching incidents' });
+    console.error('Error fetching incident:', error);
+    res.status(500).json({ error: 'An error occurred while fetching the incident' });
   }
 });
 

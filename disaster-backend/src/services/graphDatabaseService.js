@@ -1,16 +1,15 @@
 console.log('Loading graphDatabaseService.js');
 import neo4j from 'neo4j-driver';
-import { driver } from '../config/neo4jConfig.js';
+import { getDriver, runQuery } from '../config/neo4jConfig.js';
 import logger from '../utils/logger.js';
 
 export async function createNewIncidentReportNeo4j(incidentData) {
-  const session = driver.session();
   try {
     console.log('Creating new incident report:', incidentData);
-    const result = await session.run(
+    const result = await runQuery(
       `
       CREATE (i:IncidentReport {
-        id: randomUUID(),
+        incidentId: randomUUID(),
         type: $type,
         description: $description,
         latitude: $latitude,
@@ -58,41 +57,39 @@ export async function createNewIncidentReportNeo4j(incidentData) {
       }
     );
     console.log('Incident report created successfully');
-    return result.records[0].get('i').properties;
+    return result[0].get('i').properties;
   } catch (error) {
     logger.error('Error creating incident report in Neo4j:', error);
     throw error;
-  } finally {
-    await session.close();
   }
 }
 
-export async function getIncidentReportNeo4j(id) {
-  const session = driver.session();
+export async function getIncidentReportNeo4j(incidentId) {
   try {
-    const result = await session.run(
+    const result = await runQuery(
       `
-      MATCH (i:IncidentReport {id: $id})
+      MATCH (i:IncidentReport {incidentId: $incidentId})
       RETURN i
       `,
-      { id }
+      { incidentId }
     );
-    return result.records[0]?.get('i').properties;
-  } finally {
-    await session.close();
+    return result[0]?.get('i').properties;
+  } catch (error) {
+    logger.error('Error fetching incident report from Neo4j:', error);
+    throw error;
   }
 }
 
-export async function updateIncidentReport(id, updateData) {
+export async function updateIncidentReport(incidentId, updateData) {
   const session = driver.session();
   try {
     const result = await session.run(
       `
-      MATCH (i:IncidentReport {id: $id})
+      MATCH (i:IncidentReport {incidentId: $incidentId})
       SET i += $updateData, i.updatedAt = datetime()
       RETURN i
       `,
-      { id, updateData }
+      { incidentId, updateData }
     );
     return result.records[0].get('i').properties;
   } catch (error) {
@@ -103,15 +100,15 @@ export async function updateIncidentReport(id, updateData) {
   }
 }
 
-export async function deleteIncidentReport(id) {
+export async function deleteIncidentReport(incidentId) {
   const session = driver.session();
   try {
     await session.run(
       `
-      MATCH (i:IncidentReport {id: $id})
+      MATCH (i:IncidentReport {incidentId: $incidentId})
       DETACH DELETE i
       `,
-      { id }
+      { incidentId }
     );
   } finally {
     await session.close();
@@ -123,7 +120,7 @@ export async function getRelatedIncidents(incidentId) {
   try {
     const result = await session.run(
       `
-      MATCH (i:IncidentReport {id: $incidentId})-[:HAS_KEYWORD]->(k:Keyword)<-[:HAS_KEYWORD]-(relatedIncident:IncidentReport)
+      MATCH (i:IncidentReport {incidentId: $incidentId})-[:HAS_KEYWORD]->(k:Keyword)<-[:HAS_KEYWORD]-(relatedIncident:IncidentReport)
       WHERE i <> relatedIncident
       RETURN DISTINCT relatedIncident, count(k) AS commonKeywords
       ORDER BY commonKeywords DESC
@@ -170,7 +167,7 @@ export async function getIncidentTimeline(incidentId) {
   try {
     const result = await session.run(
       `
-      MATCH (i:IncidentReport {id: $incidentId})-[r:HAS_UPDATE]->(u:Update)
+      MATCH (i:IncidentReport {incidentId: $incidentId})-[r:HAS_UPDATE]->(u:Update)
       RETURN u
       ORDER BY u.timestamp
       `,
@@ -188,7 +185,7 @@ export async function createIncidentNode(incident) {
     const result = await session.run(
       `
       CREATE (i:Incident {
-        id: $id,
+        incidentId: $incidentId,
         type: $type,
         description: $description,
         severity: $severity,
@@ -200,7 +197,7 @@ export async function createIncidentNode(incident) {
       RETURN i
       `,
       {
-        id: incident.id,
+        incidentId: incident.incidentId,
         type: incident.type,
         description: incident.description,
         severity: incident.severity,
@@ -220,7 +217,7 @@ export async function createKeywordRelationships(incidentId, keywords) {
   try {
     await session.run(
       `
-      MATCH (i:Incident {id: $incidentId})
+      MATCH (i:Incident {incidentId: $incidentId})
       UNWIND $keywords AS keyword
       MERGE (k:Keyword {name: keyword})
       MERGE (i)-[:HAS_KEYWORD]->(k)
@@ -244,7 +241,7 @@ export async function createLocationRelationship(incidentId, locationName) {
   try {
     await session.run(
       `
-      MATCH (i:Incident {id: $incidentId})
+      MATCH (i:Incident {incidentId: $incidentId})
       MERGE (l:Location {name: $locationName})
       MERGE (i)-[:OCCURRED_AT]->(l)
       `,
@@ -267,7 +264,7 @@ export async function getIncidentReportsNeo4j(query = {}) {
   try {
     const result = await session.run(
       `
-      MATCH (i:IncidentReport)
+      MATCH (i:Incident)
       WHERE i.createdAt >= $startDate
       RETURN i
       ORDER BY i.createdAt DESC
@@ -289,7 +286,7 @@ export async function getIncidentReportsNearLocation(latitude, longitude, radius
   try {
     const result = await session.run(
       `
-      MATCH (i:IncidentReport)
+      MATCH (i:Incident)
       WHERE point.distance(point({latitude: i.latitude, longitude: i.longitude}), 
                            point({latitude: $latitude, longitude: $longitude})) <= $radius
       RETURN i,

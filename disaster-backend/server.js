@@ -5,93 +5,55 @@ import { initializeSocketIO } from './src/services/socketService.js';
 import { initializeNeo4j } from './src/config/neo4jConfig.js';
 import { monitorIncidents } from './src/workers/monitorIncidents.js';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import logger from './src/utils/logger.js';
 import { checkEnv } from './checkEnv.js';
 import { closeNeo4jConnection } from './src/config/neo4jConfig.js';
 import { getRedisClient } from './src/services/statisticsService.js';
 
-console.log('Loading server.js');
+dotenv.config();
 
-console.log('UPDATED_OPEN_AI_API_KEY:', process.env.UPDATED_OPEN_AI_API_KEY);
-console.log('PINECONE_API_KEY:', process.env.PINECONE_API_KEY);
-
-const PORT = parseInt(process.env.PORT) || 3001;
-const MAX_PORT_ATTEMPTS = 10;
-
-async function startServer(attempt = 0) {
-  if (attempt >= MAX_PORT_ATTEMPTS) {
-    logger.error('Failed to find an available port after multiple attempts');
-    process.exit(1);
-  }
-
-  const currentPort = PORT + attempt;
-
-  if (currentPort >= 65536) {
-    logger.error('Port number exceeded maximum allowed value');
-    process.exit(1);
-  }
-
-  const server = http.createServer(app);
-  initializeSocketIO(server);
-
-  try {
-    const neo4jConnected = await initializeNeo4j();
-    if (!neo4jConnected) {
-      logger.warn('Failed to connect to Neo4j. Continuing without Neo4j...');
-    }
-    await new Promise((resolve, reject) => {
-      server.listen(currentPort, () => {
-        logger.info(`Server started on port ${currentPort}`);
-        resolve();
-      }).on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          logger.warn(`Port ${currentPort} is busy, trying the next one...`);
-          reject(err);
-        } else {
-          logger.error('Error starting server:', err);
-          reject(err);
-        }
-      });
-    });
-    
-    // Start the incident monitoring worker
-    monitorIncidents().catch(error => logger.error('Error in monitorIncidents:', error));
-  } catch (err) {
-    if (err.code === 'EADDRINUSE') {
-      startServer(attempt + 1);
-    } else {
-      logger.error('Error starting server:', err);
-      process.exit(1);
-    }
-  }
-}
+const PORT = process.env.PORT || 4000; // Fixed port
 
 checkEnv();
+initializeNeo4j();
 
-startServer();
+const server = http.createServer(app);
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+initializeSocketIO(server);
+
+// Start the incident monitoring interval
+const incidentMonitorInterval = setInterval(monitorIncidents, 5 * 60 * 1000); // Run every 5 minutes
+
+// Optionally run it immediately on startup
+monitorIncidents();
+
+server.listen(PORT, () => {
+  console.log(`Disaster backend server is running on port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`);
+});
 
 async function gracefulShutdown(signal) {
-  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+  logger.info(`Received ${signal}. Shutting down gracefully...`);
 
-  server.close(() => {
-    logger.info('HTTP server closed');
-  });
+  // Clear the incident monitoring interval
+  clearInterval(incidentMonitorInterval);
 
-  const redisClient = await getRedisClient();
-  if (redisClient.isOpen) {
-    await redisClient.quit();
-    logger.info('Redis connection closed');
+  // Close server
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
   }
 
-  await closeNeo4jConnection();
+  // Additional cleanup if needed
+  // e.g., Close database connections, clear timeouts, etc.
 
-  // Close other connections or perform cleanup here
-
-  logger.info('Graceful shutdown completed');
-  process.exit(0);
+  // Exit the process after a delay to ensure all cleanup is complete
+  setTimeout(() => {
+    logger.info('Graceful shutdown completed');
+    process.exit(0);
+  }, 3000); // Adjust the delay as needed
 }
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

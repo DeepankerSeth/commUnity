@@ -40,7 +40,7 @@ export async function initializeVectorStore() {
 
     const embeddings = new OpenAIEmbeddings({ 
       openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY,
-      modelName: "text-embedding-3-large"
+      modelName: "text-embedding-3-small"
     });
 
     vectorStore = await PineconeStore.fromExistingIndex(

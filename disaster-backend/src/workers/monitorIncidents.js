@@ -13,7 +13,7 @@ import { generateNotification, sendNotification } from '../services/notification
 import { getClusterData } from '../services/clusteringService.js';
 import { emitIncidentUpdate, emitNewIncident, emitVerificationUpdate, emitClusterUpdate } from '../services/socketService.js';
 import { verifyIncident } from '../services/verificationService.js';
-// import { checkGeofencesAndNotify } from '../services/geofencingService.js';
+import { runQuery } from '../config/neo4jConfig.js';
 import {
   createIncidentNode,
   createKeywordRelationships,
@@ -32,7 +32,10 @@ let vectorStore;
 async function setupVectorStore() {
   const index = pinecone.Index(process.env.PINECONE_INDEX);
   vectorStore = await PineconeStore.fromExistingIndex(
-    new OpenAIEmbeddings({ openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY }),
+    new OpenAIEmbeddings({ 
+      modelName: "text-embedding-3-small", 
+      openAIApiKey: process.env.UPDATED_OPEN_AI_API_KEY 
+    }),
     { pineconeIndex: index }
   );
 }
@@ -42,26 +45,28 @@ setupVectorStore();
 let isMonitoring = false;
 
 export async function monitorIncidents() {
+  if (isMonitoring) {
+    logger.info('monitorIncidents is already running. Skipping this execution.');
+    return;
+  }
+
+  isMonitoring = true;
   try {
-    await setupVectorStore();
-
-    if (isMonitoring) return;
-    isMonitoring = true;
-
     logger.info('Starting monitorIncidents function');
+    
+    const recentIncidents = await runQuery(`
+      MATCH (i:IncidentReport)
+      WHERE i.createdAt >= datetime() - duration('PT30M')
+      RETURN i
+      ORDER BY i.createdAt DESC
+    `);
 
-    const recentIncidents = await getIncidentReport({
-      createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes
-    });
+    logger.info(`Found ${recentIncidents.length} recent incidents`);
 
-    logger.info(`Found ${recentIncidents ? recentIncidents.length : 0 } recent incidents`);
-    if (recentIncidents == undefined) {
-      logger.info('No recent incidents found, skipping processing');
-      return;
-    }
-    for (const incident of recentIncidents) {
+    for (const record of recentIncidents) {
+      const incident = record.get('i').properties;
       try {
-        logger.info(`Processing incident ${incident._id}`);
+        logger.info(`Processing incident ${incident.id}`);
         const analysis = await processIncident(incident);
         incident.analysis = analysis.analysis;
         incident.severity = analysis.severity;
@@ -75,29 +80,53 @@ export async function monitorIncidents() {
           timestamp: new Date()
         });
 
-        await incident.save();
-        logger.info(`Saved updated incident ${incident._id}`);
+        // Update incident in Neo4j
+        await runQuery(`
+          MATCH (i:IncidentReport {id: $id})
+          SET i += $updates, i.updatedAt = datetime()
+          RETURN i
+        `, {
+          id: incident.id,
+          updates: {
+            analysis: incident.analysis,
+            severity: incident.severity,
+            impactRadius: incident.impactRadius,
+            timeline: incident.timeline
+          }
+        });
 
-        // Update Neo4j if connected
+        logger.info(`Saved updated incident ${incident.id}`);
+
+        // Update Neo4j graph structure
         try {
           await createIncidentNode(incident);
-          await createKeywordRelationships(incident._id.toString(), incident.metadata.keywords);
-          await createLocationRelationship(incident._id.toString(), incident.metadata.placeOfImpact);
-          logger.info(`Updated Neo4j for incident ${incident._id}`);
+          await createKeywordRelationships(incident.id, incident.metadata.keywords);
+          await createLocationRelationship(incident.id, incident.metadata.placeOfImpact);
+          logger.info(`Updated Neo4j graph for incident ${incident.id}`);
         } catch (neoError) {
-          logger.warn(`Failed to update Neo4j for incident ${incident._id}:`, neoError);
+          logger.warn(`Failed to update Neo4j graph for incident ${incident.id}:`, neoError);
         }
 
         // Get related incidents from Neo4j
-        const relatedIncidents = await getRelatedIncidents(incident._id.toString());
-
-        await incident.save();
+        const relatedIncidents = await runQuery(`
+          MATCH (i:IncidentReport {id: $id})-[:HAS_KEYWORD]->(k:Keyword)<-[:HAS_KEYWORD]-(relatedIncident:IncidentReport)
+          WHERE i <> relatedIncident
+          RETURN DISTINCT relatedIncident, count(k) AS commonKeywords
+          ORDER BY commonKeywords DESC
+          LIMIT 5
+        `, { id: incident.id });
 
         // Emit updated incident data to all connected clients
-        emitIncidentUpdate(incident._id, incident);
-        logger.info(`Emitted update for incident ${incident._id}`);
+        emitIncidentUpdate(incident.id, {
+          ...incident,
+          relatedIncidents: relatedIncidents.map(record => ({
+            incident: record.get('relatedIncident').properties,
+            commonKeywords: record.get('commonKeywords').toNumber()
+          }))
+        });
+        logger.info(`Emitted update for incident ${incident.id}`);
       } catch (error) {
-        logger.error(`Error processing incident ${incident._id}:`, error);
+        logger.error(`Error processing incident ${incident.id}:`, error);
       }
     }
 
@@ -119,30 +148,13 @@ export async function monitorIncidents() {
     } catch (error) {
       logger.error('Error generating statistics:', error);
     }
+
   } catch (error) {
     logger.error('Error in monitorIncidents:', error);
   } finally {
-    logger.info('Scheduling next run of monitorIncidents');
-    setTimeout(monitorIncidents, 60000); // Run every minute
+    isMonitoring = false;
+    logger.info('monitorIncidents execution completed');
   }
 }
-
-async function updateLLMModel() {
-  try {
-    const feedbackData = await getFeedbackForTraining();
-    if (feedbackData.length > 0) {
-      await fineTuneLLM(feedbackData);
-      console.log('LLM model updated with new feedback data');
-    }
-  } catch (error) {
-    console.error('Error updating LLM model:', error);
-  }
-}
-
-// Call updateLLMModel every 24 hours
-setInterval(updateLLMModel, 24 * 60 * 60 * 1000);
-
-// Run the monitoring function every 5 minutes
-setInterval(monitorIncidents, 5 * 60 * 1000);
 
 logger.info('Incident monitoring worker loaded');

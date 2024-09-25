@@ -41,7 +41,7 @@ export async function performHybridSearch(query, k, filters = {}) {
 async function performSemanticSearch(query, k) {
   const openai = new OpenAI({ apiKey: process.env.UPDATED_OPEN_AI_API_KEY });
   const embedding = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+    model: "text-embedding-3-small",
     input: query,
   });
 
@@ -118,7 +118,7 @@ export async function deleteFromVectorStore(incidentId) {
 async function generateEmbedding(text) {
   const openai = new OpenAI({ apiKey: process.env.UPDATED_OPEN_AI_API_KEY });
   const response = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+    model: "text-embedding-3-small",
     input: text,
   });
   return response.data[0].embedding;
